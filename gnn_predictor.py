@@ -78,9 +78,9 @@ class GCNPredictor:
     def __init__(self, model_path=None, device=None):
         """
         初始化预测器
-        
+
         参数:
-            model_path: 模型文件路径，默认为桌面上的完整模型
+            model_path: 模型文件路径，默认为当前目录的模型文件
             device: 设备 ('cpu' 或 'cuda')，自动检测
         """
         # 设置设备
@@ -88,19 +88,18 @@ class GCNPredictor:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = torch.device(device)
-        
+
         # 设置模型路径
         if model_path is None:
-            # 默认使用 best_model (state_dict) 而不是 complete_model
-            # complete_model 保存的是完整对象，容易出现类定义不匹配问题
-            # best_model 保存的是 state_dict，更稳定
-            model_path = r'C:\Users\dadamingli\Desktop\gcn_egfr_best_model.pth'
-        
+            # 获取当前文件所在目录，然后相对于它找到模型文件
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(current_dir, 'gcn_egfr_best_model.pth')
+
         self.model_path = model_path
         self.model = None
         self.input_dim = 12  # 与您的模型输入维度一致
         self.hidden_dim = 128  # 与您的模型隐藏层维度一致
-        
+
         # 加载模型
         self._load_model()
         logger.info(f"✅ GCN预测器初始化完成，使用设备: {self.device}")

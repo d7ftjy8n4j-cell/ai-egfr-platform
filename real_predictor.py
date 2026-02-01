@@ -11,27 +11,27 @@ import pandas as pd
 
 class RealEGFRPredictor:
     def __init__(self):
-        """直接从桌面加载模型和特征"""
+        """直接从当前目录加载模型和特征"""
         try:
-            # 桌面路径
-            desktop = os.path.expanduser("~/Desktop")
-            
+            # 获取当前文件所在目录，然后相对于它找到模型文件
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+
             # 加载模型
-            model_path = os.path.join(desktop, "rf_egfr_model_final.pkl")
+            model_path = os.path.join(current_dir, "rf_egfr_model_final.pkl")
             self.model = joblib.load(model_path)
             print(f"✅ 模型加载成功: {model_path}")
-            
+
             # 加载特征名称
-            feature_path = os.path.join(desktop, "feature_names.json")
+            feature_path = os.path.join(current_dir, "feature_names.json")
             with open(feature_path, 'r', encoding='utf-8') as f:
                 self.feature_names = json.load(f)
             print(f"✅ 加载 {len(self.feature_names)} 个特征")
-            
+
             # 验证
             if hasattr(self.model, 'n_features_in_'):
                 if len(self.feature_names) != self.model.n_features_in_:
                     print(f"⚠️ 特征数量不匹配！请检查feature_names.json")
-            
+
         except Exception as e:
             print(f"❌ 初始化失败: {e}")
             import traceback

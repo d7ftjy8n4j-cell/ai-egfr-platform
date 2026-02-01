@@ -79,30 +79,18 @@ def init_predictors():
     # 初始化随机森林预测器
     if RF_PREDICTOR_AVAILABLE:
         try:
-            # 使用绝对路径确保能找到模型文件
-            desktop_path = os.path.expanduser("~/Desktop")
-            rf_model_path = os.path.join(desktop_path, "rf_egfr_model_final.pkl")
-            
-            if os.path.exists(rf_model_path):
-                predictors['rf'] = RealEGFRPredictor()
-                st.sidebar.info(f"✓ RF模型: {os.path.basename(rf_model_path)}")
-            else:
-                st.sidebar.error(f"❌ RF模型文件未找到: {rf_model_path}")
+            # 修改点1：使用相对路径，假设模型文件在项目根目录
+            predictors['rf'] = RealEGFRPredictor()
+            st.sidebar.info("✅ RF模型加载成功")
         except Exception as e:
             st.sidebar.error(f"❌ RF预测器初始化失败: {str(e)[:50]}")
     
     # 初始化GNN预测器
     if GNN_PREDICTOR_AVAILABLE:
         try:
-            # 使用绝对路径
-            desktop_path = os.path.expanduser("~/Desktop")
-            gnn_model_path = os.path.join(desktop_path, "gcn_egfr_best_model.pth")
-            
-            if os.path.exists(gnn_model_path):
-                predictors['gnn'] = GCNPredictor(model_path=gnn_model_path, device='cpu')
-                st.sidebar.info(f"✓ GNN模型: {os.path.basename(gnn_model_path)}")
-            else:
-                st.sidebar.error(f"❌ GNN模型文件未找到: {gnn_model_path}")
+            # 修改点2：同样使用相对路径
+            predictors['gnn'] = GCNPredictor(device='cpu')
+            st.sidebar.info("✅ GNN模型加载成功")
         except Exception as e:
             st.sidebar.error(f"❌ GNN预测器初始化失败: {str(e)[:50]}")
     
