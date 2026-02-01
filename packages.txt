@@ -1,0 +1,5 @@
+libxrender1
+libsm6
+libxext6
+libfontconfig1
+libgl1-mesa-glx
