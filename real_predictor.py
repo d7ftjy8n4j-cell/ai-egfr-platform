@@ -15,30 +15,51 @@ class RealEGFRPredictor:
         try:
             # 获取当前文件所在目录，然后相对于它找到模型文件
             current_dir = os.path.dirname(os.path.abspath(__file__))
+            print(f"📁 当前目录: {current_dir}")
 
             # 加载模型（使用兼容numpy 1.24.4的版本）
             model_path = os.path.join(current_dir, "rf_egfr_model_final.pkl")
             # 如果存在兼容模型，优先使用兼容模型
             compatible_model_path = os.path.join(current_dir, "rf_egfr_model_compatible.pkl")
+
+            print(f"🔍 检查模型文件...")
+            print(f"   原始模型: {model_path} (存在: {os.path.exists(model_path)})")
+            print(f"   兼容模型: {compatible_model_path} (存在: {os.path.exists(compatible_model_path)})")
+
+            # 确定使用哪个模型
             if os.path.exists(compatible_model_path):
                 model_path = compatible_model_path
-                print(f"✅ 使用兼容模型（numpy 1.24.4）")
+                print(f"✅ 使用兼容模型")
+            elif not os.path.exists(model_path):
+                raise FileNotFoundError(f"模型文件不存在: {model_path}")
+
+            # 加载模型
+            print(f"📦 开始加载模型: {model_path}")
             self.model = joblib.load(model_path)
-            print(f"✅ 模型加载成功: {model_path}")
+            print(f"✅ 模型加载成功")
+            print(f"   模型类型: {type(self.model).__name__}")
 
             # 加载特征名称
             feature_path = os.path.join(current_dir, "feature_names.json")
+            print(f"\n📋 加载特征文件: {feature_path}")
+            if not os.path.exists(feature_path):
+                raise FileNotFoundError(f"特征文件不存在: {feature_path}")
+
             with open(feature_path, 'r', encoding='utf-8') as f:
                 self.feature_names = json.load(f)
             print(f"✅ 加载 {len(self.feature_names)} 个特征")
 
             # 验证
             if hasattr(self.model, 'n_features_in_'):
+                print(f"   模型期望特征数: {self.model.n_features_in_}")
                 if len(self.feature_names) != self.model.n_features_in_:
-                    print(f"⚠️ 特征数量不匹配！请检查feature_names.json")
+                    print(f"⚠️ 警告：特征数量不匹配！")
+                    print(f"   特征文件: {len(self.feature_names)} 个")
+                    print(f"   模型期望: {self.model.n_features_in_} 个")
 
         except Exception as e:
             print(f"❌ 初始化失败: {e}")
+            print(f"\n错误详情:")
             import traceback
             traceback.print_exc()
             self.model = None

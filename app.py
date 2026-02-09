@@ -133,19 +133,27 @@ def check_gnn_model_files():
     return missing_files
 
 # ========== 1. 双模型预测器导入 ==========
-RF_PREDICTOR_AVAILABLE = True  # 已启用RF模型（使用兼容版本）
+RF_PREDICTOR_AVAILABLE = True
 GNN_PREDICTOR_AVAILABLE = False
 
 # 导入随机森林预测器
 try:
     sys.path.append(Config.BASE_DIR)
     from real_predictor import RealEGFRPredictor
+    # 尝试初始化以验证模型加载
+    test_predictor = RealEGFRPredictor()
+    if test_predictor.model is None:
+        raise Exception("模型加载失败: 模型为None")
     RF_PREDICTOR_AVAILABLE = True
     st.sidebar.success("✅ 随机森林预测器就绪")
     logging.info("随机森林预测器导入成功")
-except ImportError as e:
-    st.sidebar.warning(f"⚠️ 随机森林预测器导入失败: {str(e)[:50]}...")
-    logging.error(f"随机森林预测器导入失败: {e}")
+except Exception as e:
+    RF_PREDICTOR_AVAILABLE = False
+    st.sidebar.error(f"❌ 随机森林预测器初始化失败")
+    st.sidebar.warning(f"错误详情: {str(e)[:100]}...")
+    logging.error(f"随机森林预测器失败: {e}")
+    import traceback
+    traceback.print_exc()
 
 # 导入GNN预测器
 try:
