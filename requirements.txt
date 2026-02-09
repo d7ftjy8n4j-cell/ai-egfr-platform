@@ -17,10 +17,8 @@ torchaudio==2.1.2+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 # 图神经网络（与 torch 兼容的扩展，可按需安装具体版本）
-torch-scatter
-torch-sparse
-torch-cluster
-torch-spline-conv
+# 使用预编译的wheel，兼容Python 3.10和CPU版本
+--find-links https://data.pyg.org/whl/torch-2.1.0+cpu.html
 torch-geometric==2.4.0
 
 # 可视化与图像
@@ -30,3 +28,6 @@ plotly>=6.5.0
 
 # 网络请求与工具
 requests>=2.31.0
+
+# 修复streamlit依赖版本冲突
+rich>=10.14.0,<14
