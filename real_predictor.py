@@ -16,8 +16,13 @@ class RealEGFRPredictor:
             # 获取当前文件所在目录，然后相对于它找到模型文件
             current_dir = os.path.dirname(os.path.abspath(__file__))
 
-            # 加载模型
+            # 加载模型（使用兼容numpy 1.24.4的版本）
             model_path = os.path.join(current_dir, "rf_egfr_model_final.pkl")
+            # 如果存在兼容模型，优先使用兼容模型
+            compatible_model_path = os.path.join(current_dir, "rf_egfr_model_compatible.pkl")
+            if os.path.exists(compatible_model_path):
+                model_path = compatible_model_path
+                print(f"✅ 使用兼容模型（numpy 1.24.4）")
             self.model = joblib.load(model_path)
             print(f"✅ 模型加载成功: {model_path}")
 

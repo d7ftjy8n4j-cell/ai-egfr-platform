@@ -133,7 +133,7 @@ def check_gnn_model_files():
     return missing_files
 
 # ========== 1. 双模型预测器导入 ==========
-RF_PREDICTOR_AVAILABLE = False
+RF_PREDICTOR_AVAILABLE = True  # 已启用RF模型（使用兼容版本）
 GNN_PREDICTOR_AVAILABLE = False
 
 # 导入随机森林预测器
