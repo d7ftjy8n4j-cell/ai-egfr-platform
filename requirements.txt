@@ -29,5 +29,5 @@ plotly>=6.5.0
 # 网络请求与工具
 requests>=2.31.0
 
-# 修复streamlit依赖版本冲突
-rich>=10.14.0,<14
+# 修复streamlit依赖版本冲突（精确锁定版本）
+rich==13.7.1
