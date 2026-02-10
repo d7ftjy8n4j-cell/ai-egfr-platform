@@ -706,7 +706,7 @@ with tab4:
     | **创新性** | 传统 | 前沿 | GNN代表AI趋势 |
     """)
 
-with tab5:
+with tab4:
     st.header("ℹ️ 关于项目")
 
     st.markdown("""
