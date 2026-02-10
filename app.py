@@ -193,6 +193,17 @@ except ImportError as e:
     st.sidebar.warning(f"⚠️ 高级化学洞察模块未加载: {e}")
     logging.warning(f"高级化学洞察模块导入失败: {e}")
 
+# ========== 化学洞察安全模块导入 ==========
+try:
+    from chem_insight_safe import render_safe_chem_insight
+    CHEM_INSIGHT_AVAILABLE = True
+    st.sidebar.success("✅ 化学洞察模块就绪")
+    logging.info("化学洞察模块导入成功")
+except ImportError as e:
+    CHEM_INSIGHT_AVAILABLE = False
+    st.sidebar.warning(f"⚠️ 化学洞察模块导入失败: {e}")
+    logging.warning(f"化学洞察模块导入失败: {e}")
+
 # ========== 2. 应用标题与介绍 ==========
 st.title("🧬 EGFR抑制剂智能预测系统")
 st.markdown("""
@@ -437,10 +448,10 @@ def compare_results(rf_result, gnn_result):
 # ========== 5. 主界面 - 标签页设计 ==========
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🧪 分子预测",
-    "🔍 化学依据",       # 基础版
-    "🔬 高级分析",       # 新增：高级T004分析
+    "🔍 化学依据",
+    "🔬 高级分析",       # 高级T004分析
     "📊 模型分析",
-    "ℹ️ 关于项目"
+    "📚 关于项目"
 ])
 
 with tab1:
@@ -612,7 +623,11 @@ with tab1:
 
 with tab2:
     st.header("🔍 化学依据分析")
-    st.info("💡 这里展示基础的化学依据分析功能（待实现）")
+    if CHEM_INSIGHT_AVAILABLE:
+        render_safe_chem_insight()
+    else:
+        st.error("化学洞察模块不可用")
+        st.code("请确保 chem_insight_safe.py 和 molecule_utils.py 文件存在")
 
 with tab3:  # 新增的高级分析标签页
     if ADVANCED_CHEM_INSIGHT_AVAILABLE:
