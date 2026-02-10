@@ -12,8 +12,18 @@ import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
-from rdkit import Chem, DataStructs, AllChem
+import streamlit as st
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import base64
+from io import BytesIO
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+from rdkit import Chem
+from rdkit import DataStructs
 from rdkit.Chem import (
+    AllChem,  # 注意：AllChem 在这里！
     PandasTools,
     Draw,
     Descriptors,
