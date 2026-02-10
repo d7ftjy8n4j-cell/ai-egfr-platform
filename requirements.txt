@@ -29,5 +29,6 @@ plotly>=6.5.0
 # 网络请求与工具
 requests>=2.31.0
 
-# 修复streamlit依赖版本冲突（精确锁定版本）
+# 修复streamlit依赖版本冲突（精确锁定版本，放在前面）
 rich==13.7.1
+markdown-it-py<3
