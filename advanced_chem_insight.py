@@ -12,14 +12,17 @@ import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
-from rdkit import Chem, DataStructs
+from rdkit import Chem, DataStructs, AllChem
 from rdkit.Chem import (
     PandasTools,
     Draw,
     Descriptors,
     MACCSkeys,
     rdFingerprintGenerator,
-    Fragments
+    Fragments,
+    Lipinski,
+    Crippen,
+    rdMolDescriptors
 )
 from rdkit.Chem.Draw import rdDepictor
 import matplotlib
@@ -30,6 +33,8 @@ from typing import List, Dict, Tuple, Optional, Any
 from dataclasses import dataclass
 import os
 import random
+import re
+import logging
 
 # 配置设置
 rdDepictor.SetPreferCoordGen(True)
@@ -56,17 +61,126 @@ class AdvancedMolecularSimilarity:
             fpSize=self.config.fp_size
         )
     
-    def smiles_to_mol(self, smiles: str) -> Optional[Chem.rdchem.Mol]:
-        """安全地将SMILES转换为分子对象"""
-        try:
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is None:
-                # 尝试清理SMILES
-                smiles_clean = smiles.split()[0].strip()
-                mol = Chem.MolFromSmiles(smiles_clean)
-            return mol
-        except Exception:
+    def smiles_to_mol(self, smiles: str, sanitize: bool = True) -> Optional[Chem.rdchem.Mol]:
+        """SMILES转分子对象，增强错误处理"""
+        if not smiles or not isinstance(smiles, str):
             return None
+
+        try:
+            # 清理SMILES字符串
+            smiles_clean = smiles.strip().split()[0]  # 取第一个片段
+
+            # 尝试解析
+            mol = Chem.MolFromSmiles(smiles_clean, sanitize=sanitize)
+
+            if mol is None and sanitize:
+                # 如果标准解析失败，尝试不进行价态检查
+                mol = Chem.MolFromSmiles(smiles_clean, sanitize=False)
+
+            if mol is None:
+                # 尝试修复常见问题
+                smiles_fixed = self._fix_common_smiles_issues(smiles_clean)
+                if smiles_fixed != smiles_clean:
+                    mol = Chem.MolFromSmiles(smiles_fixed, sanitize=False)
+
+            return mol
+        except Exception as e:
+            logging.warning(f"SMILES解析失败 '{smiles[:30]}...': {e}")
+            return None
+
+    def _fix_common_smiles_issues(self, smiles: str) -> str:
+        """尝试修复常见的SMILES问题"""
+        fixes = [
+            # 修复氢原子表示
+            (r'\[H\]', 'H'),
+            # 修复电荷表示（确保方括号）
+            (r'(?<!\[)(\+{1,2}|\-{1,2})(?!\])', r'[\1]'),
+            # 修复同位素表示
+            (r'(\d+)([A-Z][a-z]?)', r'[\1\2]'),
+            # 移除多余空格
+            (r'\s+', ''),
+        ]
+
+        fixed = smiles
+        for pattern, replacement in fixes:
+            fixed = re.sub(pattern, replacement, fixed)
+
+        return fixed
+
+    def calculate_similarity(self, mol1: Optional[Chem.rdchem.Mol],
+                           mol2: Optional[Chem.rdchem.Mol],
+                           fp_type: str = 'Morgan2') -> float:
+        """计算两个分子的相似度 - 修复版"""
+        # 检查分子是否有效
+        if mol1 is None or mol2 is None:
+            logging.warning("分子对象为None，无法计算相似度")
+            return 0.0
+
+        # 指纹类型映射（修复名称）
+        fp_calculators = {
+            'Morgan2': lambda m: AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048),
+            'Morgan': lambda m: AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048),  # 别名
+            'MACCS': lambda m: AllChem.GetMACCSKeysFingerprint(m),
+            'maccs_fp': lambda m: AllChem.GetMACCSKeysFingerprint(m),  # 兼容旧名称
+            'RDKit': lambda m: Chem.RDKFingerprint(m),
+            'AtomPair': lambda m: AllChem.GetHashedAtomPairFingerprintAsBitVect(m, nBits=2048),
+            'tanimoto_morgan': lambda m: AllChem.GetMorganFingerprint(m, 2)  # 非位向量版本
+        }
+
+        # 获取正确的计算器
+        if fp_type not in fp_calculators:
+            fp_type = 'Morgan2'  # 默认回退
+
+        try:
+            fp1 = fp_calculators[fp_type](mol1)
+            fp2 = fp_calculators[fp_type](mol2)
+
+            # 根据指纹类型选择相似度计算方法
+            if fp_type == 'tanimoto_morgan':
+                # 对于非位向量指纹
+                return DataStructs.TanimotoSimilarity(fp1, fp2)
+            else:
+                # 对于位向量指纹
+                return DataStructs.TanimotoSimilarity(fp1, fp2)
+
+        except Exception as e:
+            logging.error(f"相似度计算失败 (fp_type={fp_type}): {e}")
+            return 0.0
+
+    def calculate_molecular_properties(self, smiles: str) -> Dict[str, Any]:
+        """计算分子性质 - 修复版"""
+        mol = self.smiles_to_mol(smiles)
+        if mol is None:
+            logging.error(f"无法解析SMILES: {smiles}")
+            return {}
+
+        try:
+            # 使用正确的函数名称和参数
+            return {
+                'mw': Descriptors.ExactMolWt(mol),  # 使用Descriptors中的函数
+                'logp': Crippen.MolLogP(mol),
+                'hbd': Lipinski.NumHDonors(mol),
+                'hba': Lipinski.NumHAcceptors(mol),
+                'rotatable_bonds': Lipinski.NumRotatableBonds(mol),
+                'aromatic_rings': rdMolDescriptors.CalcNumAromaticRings(mol),
+                'tpsa': rdMolDescriptors.CalcTPSA(mol),
+                'heavy_atoms': Lipinski.HeavyAtomCount(mol),
+                'formal_charge': Chem.GetFormalCharge(mol)  # 注意：这是整个分子的形式电荷
+            }
+        except Exception as e:
+            logging.error(f"描述符计算失败: {e}")
+            # 返回基本属性作为降级方案
+            return {
+                'mw': 0,
+                'logp': 0,
+                'hbd': 0,
+                'hba': 0,
+                'rotatable_bonds': 0,
+                'aromatic_rings': 0,
+                'tpsa': 0,
+                'heavy_atoms': mol.GetNumHeavyAtoms() if mol else 0,
+                'formal_charge': 0
+            }
     
     def calculate_descriptors(self, molecules_df: pd.DataFrame) -> pd.DataFrame:
         """计算分子描述符（包含错误处理）"""
