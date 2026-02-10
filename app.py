@@ -57,6 +57,12 @@ if 'last_smiles' not in st.session_state:
     st.session_state.last_smiles = ""
 if 'prediction_count' not in st.session_state:
     st.session_state.prediction_count = 0
+if 'last_rf_result' not in st.session_state:
+    st.session_state.last_rf_result = None
+if 'last_gnn_result' not in st.session_state:
+    st.session_state.last_gnn_result = None
+if 'advanced_analysis_triggered' not in st.session_state:
+    st.session_state.advanced_analysis_triggered = False
 
 # 定义常量（从 Config 类中获取，保持向后兼容）
 PROBABILITY_THRESHOLD = Config.PROBABILITY_THRESHOLD
@@ -429,13 +435,12 @@ def compare_results(rf_result, gnn_result):
                 """)
 
 # ========== 5. 主界面 - 标签页设计 ==========
-# 修改标签页定义，添加高级分析选项
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🧪 分子预测",
     "🔍 化学依据",       # 基础版
     "🔬 高级分析",       # 新增：高级T004分析
     "📊 模型分析",
-    "📚 关于项目"
+    "ℹ️ 关于项目"
 ])
 
 with tab1:
@@ -472,18 +477,18 @@ with tab1:
             "阿司匹林 (非活性对照)": "CC(=O)OC1=CC=CC=C1C(=O)O",
             "咖啡因 (非活性对照)": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
         }
-        
+
         selected_example = st.selectbox("选择示例分子:", list(example_molecules.keys()))
         smiles_input = example_molecules[selected_example]
         st.code(smiles_input)
-        
-        # 使用选择的示例进行预测
-        prediction_mode = "⚡ 双模型对比"
-    
-    # 预测按钮
-    if prediction_mode != "📚 示例分子" and st.button(
-        "🚀 开始预测", type="primary", use_container_width=True
-    ):
+
+        # 示例分子自动预测按钮
+        if st.button("🚀 使用示例分子进行预测", type="primary", use_container_width=True, key="example_predict"):
+            # 使用选择的示例进行预测
+            actual_prediction_mode = "⚡ 双模型对比"
+    else:
+        # 预测按钮（非示例模式）
+        actual_prediction_mode = prediction_mode
         # 输入验证
         smiles_clean = smiles_input.strip()
 
@@ -509,22 +514,24 @@ with tab1:
                     progress_bar.progress(10)
 
                     # ========== 标准模式 - 随机森林 ==========
-                    if prediction_mode.startswith("🤖 标准模式"):
+                    if actual_prediction_mode.startswith("🤖 标准模式"):
                         status_text.text("随机森林预测中...")
                         progress_bar.progress(30)
                         if 'rf' in predictors:
                             rf_result = predictors['rf'].predict(smiles_clean)
+                            st.session_state.last_rf_result = rf_result
                             progress_bar.progress(80)
                             display_rf_result(rf_result)
                         else:
                             st.error("随机森林预测器不可用")
 
                     # ========== 高级模式 - GNN ==========
-                    elif prediction_mode.startswith("🧠 高级模式"):
+                    elif actual_prediction_mode.startswith("🧠 高级模式"):
                         status_text.text("GNN图神经网络预测中...")
                         progress_bar.progress(30)
                         if 'gnn' in predictors:
                             gnn_result = predictors['gnn'].predict(smiles_clean)
+                            st.session_state.last_gnn_result = gnn_result
                             progress_bar.progress(60)
                             display_gnn_result(gnn_result)
 
@@ -556,8 +563,12 @@ with tab1:
                             st.error("GNN预测器不可用")
 
                     # ========== 双模型对比模式 ==========
-                    elif prediction_mode.startswith("⚡ 双模型对比"):
+                    elif actual_prediction_mode.startswith("⚡ 双模型对比"):
                         col_left, col_right = st.columns(2)
+
+                        # 初始化结果变量
+                        rf_result = None
+                        gnn_result = None
 
                         # 左侧：随机森林结果
                         with col_left:
@@ -565,6 +576,7 @@ with tab1:
                             progress_bar.progress(20)
                             if 'rf' in predictors:
                                 rf_result = predictors['rf'].predict(smiles_clean)
+                                st.session_state.last_rf_result = rf_result
                                 progress_bar.progress(40)
                                 display_rf_result(rf_result, "随机森林模型")
                             else:
@@ -576,13 +588,14 @@ with tab1:
                             progress_bar.progress(60)
                             if 'gnn' in predictors:
                                 gnn_result = predictors['gnn'].predict(smiles_clean)
+                                st.session_state.last_gnn_result = gnn_result
                                 progress_bar.progress(80)
                                 display_gnn_result(gnn_result, "GNN模型")
                             else:
                                 st.warning("GNN模型不可用")
 
-                        # 对比分析
-                        if 'rf' in predictors and 'gnn' in predictors:
+                        # 对比分析（仅当两个结果都存在时）
+                        if rf_result is not None and gnn_result is not None:
                             status_text.text("生成对比分析...")
                             progress_bar.progress(95)
                             compare_results(rf_result, gnn_result)
@@ -616,7 +629,7 @@ with tab4:
 
     # 获取图片路径
     feature_img_path = os.path.join(BASE_DIR, "feature_importance.png")
-    gcn_img_path = os.path.join(BASE_DIR, "gcn_training_history.png")
+    gcn_img_path = os.path.join(BASE_DIR, "gcn_confusion_matrix.png")
 
     col1, col2 = st.columns(2)
 
@@ -637,10 +650,10 @@ with tab4:
         st.metric("准确率", str(gnn_perf.get('accuracy', 'N/A')), "良好")
         st.metric("节点特征", gnn_perf.get('node_features', 'N/A'), "原子级特征")
 
-        with st.expander("📈 训练历史"):
-            st.image(gcn_img_path if os.path.exists(gcn_img_path) else
-                    "https://via.placeholder.com/400x200?text=GNN训练曲线",
-                    caption="GNN训练损失与准确率曲线")
+    with st.expander("📈 混淆矩阵"):
+        st.image(gcn_img_path if os.path.exists(gcn_img_path) else
+                    "https://via.placeholder.com/400x200?text=GNN混淆矩阵",
+                    caption="GNN模型混淆矩阵")
 
     # 模型对比说明
     st.markdown("---")
@@ -701,54 +714,54 @@ with tab5:
     """)
 
 with tab5:
-    st.header("📚 关于项目")
-    
+    st.header("ℹ️ 关于项目")
+
     st.markdown("""
     ### 🎯 项目简介
-    
+
     **EGFR抑制剂双引擎智能预测系统**是一个集成了传统机器学习与深度学习的计算药学平台。
     本项目展示了如何将不同范式的AI技术应用于药物发现中的关键问题——EGFR抑制剂活性预测。
-    
+
     ### 🏆 项目特色
-    
+
     1. **双模型架构**: 同时实现随机森林与图神经网络，提供多角度预测
     2. **对比分析**: 自动对比不同模型的预测结果，提高可靠性
     3. **完整流程**: 涵盖从数据获取、特征工程、模型训练到应用部署的全流程
     4. **真实数据**: 基于5,568个真实EGFR化合物的ChEMBL数据
     5. **可解释性**: 提供特征重要性分析，增强结果可信度
-    
+
     ### 🔬 科学价值
-    
+
     - **方法学对比**: 系统比较了"特征工程+传统ML"与"端到端深度学习"在药物发现中的应用
     - **技术集成**: 展示了如何将RDKit、Scikit-learn、PyTorch等工具整合到完整工作流中
     - **可复现性**: 所有代码开源，数据可公开获取，保证研究的可复现性
-    
+
     ### 📁 项目文件
-    
+
     项目包含以下核心文件:
-    
-    - `app.py` - 主应用程序 
+
+    - `app.py` - 主应用程序
     - `real_predictor.py` - 随机森林预测器
     - `gnn_predictor.py` - GNN图神经网络预测器
     - `rf_egfr_model_final.pkl` - 随机森林模型
     - `gcn_egfr_best_model.pth` - GNN模型
     - `egfr_compounds_clean.csv` - 清洗后的数据集
     - `feature_names.json` - 特征名称列表
-    
+
     ### 👨‍🔬 致谢
-    
+
     本项目基于以下开源教育资源构建:
-    
+
     - **TeachOpenCADD** 平台提供的T001、T007、T035等教程
     - **ChEMBL** 数据库提供的EGFR抑制剂活性数据
     - **RDKit** 开源化学信息学工具包
     - **PyTorch Geometric** 图神经网络库
-    
+
     ### 📄 备注
-    
+
     本项目仅供学习和研究使用。如需用于商业目的，请联系开发者获取授权。
     """)
-    
+
     # 添加时间戳
     st.caption(f"系统生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -784,30 +797,22 @@ with st.sidebar:
         else:
             st.subheader("导出预测结果")
 
-            # 模拟结果（实际应从session_state获取真实结果）
-            # 这里创建示例数据展示导出功能
-            export_data = []
+            # 从session_state获取真实的预测结果
+            export_data = {}
 
-            if 'rf' in predictors:
-                export_data.append({
-                    'model': 'rf',
-                    'prediction': 1,
-                    'probability_active': 0.855,
-                    'confidence': '高'
-                })
+            if st.session_state.get('last_rf_result'):
+                rf_result = st.session_state.last_rf_result
+                if isinstance(rf_result, dict) and 'error' not in rf_result:
+                    export_data['rf'] = rf_result
 
-            if 'gnn' in predictors:
-                export_data.append({
-                    'model': 'gnn',
-                    'prediction': 1,
-                    'probability_active': 0.808,
-                    'confidence': '中'
-                })
+            if st.session_state.get('last_gnn_result'):
+                gnn_result = st.session_state.last_gnn_result
+                if isinstance(gnn_result, dict) and gnn_result.get('success', True):
+                    export_data['gnn'] = gnn_result
 
             if export_data:
-                # 将 export_data 转换为字典格式
-                results_dict = {item['model']: item for item in export_data}
-                df = export_results_to_dataframe(results_dict)
+                # 将结果转换为DataFrame
+                df = export_results_to_dataframe(export_data)
                 st.dataframe(df, use_container_width=True, hide_index=True)
 
                 # 下载按钮

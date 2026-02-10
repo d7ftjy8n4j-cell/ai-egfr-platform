@@ -111,10 +111,14 @@ class AdvancedMolecularSimilarity:
             # 提取数据集指纹列表
             maccs_fps = df["maccs_fp"].tolist()
             morgan_fps = df["morgan_fp"].tolist()
-            morgan_count_fps = df.get("morgan_count_fp", 
-                                    df["ROMol"].apply(
-                                        self.morgan_generator.GetCountFingerprint
-                                    )).tolist()
+
+            # 安全获取计数指纹（避免重复计算）
+            if "morgan_count_fp" in df.columns:
+                morgan_count_fps = df["morgan_count_fp"].tolist()
+            else:
+                morgan_count_fps = df["ROMol"].apply(
+                    self.morgan_generator.GetCountFingerprint
+                ).tolist()
             
             # 计算MACCS相似度
             df["tanimoto_maccs"] = DataStructs.BulkTanimotoSimilarity(
@@ -258,10 +262,17 @@ class AdvancedVisualization:
         return fig
     
     @staticmethod
-    def create_enrichment_plot(df: pd.DataFrame, 
+    def create_enrichment_plot(df: pd.DataFrame,
                               similarity_measure: str = "tanimoto_morgan",
                               pic50_cutoff: float = 6.3) -> plt.Figure:
         """创建富集曲线图"""
+        # 检查pIC50列是否存在
+        if "pIC50" not in df.columns:
+            st.warning("数据集缺少pIC50列，无法生成富集曲线")
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.text(0.5, 0.5, "数据缺少活性值(pIC50)列", ha='center', va='center', fontsize=14)
+            return fig
+
         # 确保数据按相似度降序排列
         df_sorted = df.sort_values(similarity_measure, ascending=False).reset_index(drop=True)
         
@@ -470,55 +481,79 @@ class AdvancedChemInsightEngine:
         
         return results
     
-    def _generate_enrichment_data(self, df: pd.DataFrame, 
+    def _generate_enrichment_data(self, df: pd.DataFrame,
                                 similarity_measure: str) -> pd.DataFrame:
         """生成富集数据"""
         df_sorted = df.sort_values(similarity_measure, ascending=False).reset_index(drop=True)
-        
+
         n_total = len(df_sorted)
+
+        # 检查pIC50列是否存在
+        if "pIC50" not in df_sorted.columns:
+            st.warning("数据集缺少pIC50列")
+            return pd.DataFrame(columns=["%_ranked_dataset", "%_true_actives_identified"])
+
         n_actives = (df_sorted["pIC50"] >= self.config.pic50_cutoff).sum()
-        
-        df_sorted["cumulative_actives"] = (df_sorted["pIC50"] >= self.config.pic50_cutoff).cumsum()
-        df_sorted["%_ranked_dataset"] = (df_sorted.index + 1) / n_total * 100
-        df_sorted["%_true_actives_identified"] = df_sorted["cumulative_actives"] / n_actives * 100
-        
+
+        # 处理无活性分子的情况
+        if n_actives == 0:
+            df_sorted["cumulative_actives"] = 0
+            df_sorted["%_ranked_dataset"] = (df_sorted.index + 1) / n_total * 100
+            df_sorted["%_true_actives_identified"] = 0.0
+        else:
+            df_sorted["cumulative_actives"] = (df_sorted["pIC50"] >= self.config.pic50_cutoff).cumsum()
+            df_sorted["%_ranked_dataset"] = (df_sorted.index + 1) / n_total * 100
+            df_sorted["%_true_actives_identified"] = df_sorted["cumulative_actives"] / n_actives * 100
+
         return df_sorted[["%_ranked_dataset", "%_true_actives_identified"]].copy()
     
-    def calculate_enrichment_factors(self, df: pd.DataFrame, 
+    def calculate_enrichment_factors(self, df: pd.DataFrame,
                                    cutoff_percentages: List[float] = None) -> pd.DataFrame:
         """计算富集因子"""
+        # 检查pIC50列是否存在
+        if "pIC50" not in df.columns:
+            st.warning("数据集缺少pIC50列，无法计算富集因子")
+            return pd.DataFrame()
+
         if cutoff_percentages is None:
             cutoff_percentages = [1, 2, 5, 10]
-        
+
         results = []
         n_actives = (df["pIC50"] >= self.config.pic50_cutoff).sum()
         n_total = len(df)
-        
+
+        if n_actives == 0:
+            st.warning("数据集中没有活性分子(pIC50 >= 6.3)，无法计算富集因子")
+            return pd.DataFrame()
+
+        ratio_actives = n_actives / n_total * 100  # 活性分子百分比
+
         for cutoff in cutoff_percentages:
             row = {"Cutoff_%": cutoff}
-            
+
             for measure in ["tanimoto_maccs", "tanimoto_morgan"]:
                 enrichment = self._generate_enrichment_data(df, measure)
-                
+
                 mask = enrichment["%_ranked_dataset"] <= cutoff
                 if mask.any():
                     ef = enrichment.loc[mask, "%_true_actives_identified"].iloc[-1]
                     row[f"EF_{measure}"] = round(ef, 2)
                 else:
                     row[f"EF_{measure}"] = 0.0
-            
-            # 随机EF
+
+            # 随机EF（在随机筛选下，识别的活性百分比等于检查的数据百分比）
             row["EF_Random"] = cutoff
-            
-            # 最优EF
-            ratio_actives = n_actives / n_total * 100
-            if cutoff <= ratio_actives:
-                row["EF_Optimal"] = round(100 / ratio_actives * cutoff, 2)
+
+            # 最优EF：理想情况下，在检查所有活性分子后识别100%活性分子
+            # EF_Optimal = min(100 / ratio_actives, 100 / cutoff)
+            if ratio_actives > 0:
+                ef_optimal = min(100 / ratio_actives, 100 / cutoff)
+                row["EF_Optimal"] = round(ef_optimal, 2)
             else:
-                row["EF_Optimal"] = 100.0
-            
+                row["EF_Optimal"] = 0.0
+
             results.append(row)
-        
+
         return pd.DataFrame(results)
 
 def render_advanced_chem_insight():
@@ -610,22 +645,31 @@ def display_advanced_results(results: Dict, engine: AdvancedChemInsightEngine):
             col3.metric("高相似度分子", stats['high_similarity_count'])
             col4.metric("高相似度活性分子", stats['active_high_similarity'])
             
-            # 显示详细结果表格
-            st.dataframe(
-                top_df[[
-                    "molecule_chembl_id", "tanimoto_morgan", "tanimoto_maccs",
-                    "pIC50", "molecule_weight", "logp"
-                ]].rename(columns={
-                    "molecule_chembl_id": "ChEMBL ID",
-                    "tanimoto_morgan": "Morgan相似度",
-                    "tanimoto_maccs": "MACCS相似度",
-                    "pIC50": "活性值",
-                    "molecule_weight": "分子量",
-                    "logp": "LogP"
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
+            # 显示详细结果表格（动态选择可用列）
+            available_cols = []
+            column_mapping = {
+                "molecule_chembl_id": "ChEMBL ID",
+                "tanimoto_morgan": "Morgan相似度",
+                "tanimoto_maccs": "MACCS相似度",
+                "pIC50": "活性值",
+                "molecule_weight": "分子量",
+                "logp": "LogP",
+                "smiles": "SMILES"
+            }
+
+            for col in column_mapping.keys():
+                if col in top_df.columns:
+                    available_cols.append(col)
+
+            if available_cols:
+                display_df = top_df[available_cols].rename(columns=column_mapping)
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.warning("无法显示详细结果：缺少必要的列")
     
     with tab2:
         st.subheader("统计分析")
