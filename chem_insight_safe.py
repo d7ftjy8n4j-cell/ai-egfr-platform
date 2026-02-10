@@ -85,7 +85,7 @@ class SafeChemInsightEngine:
         ]
         self.reference_df = pd.DataFrame(offline_examples)
         self.data_mode = "offline"
-        st.sidebar.info("ℹ️ 使用离线示例数据")
+        
     
     def safe_find_similar_compounds(self, query_smiles, top_n=5):
         """安全地查找相似化合物"""
@@ -285,7 +285,7 @@ def render_safe_chem_insight():
         """)
         return
     
-    st.header("🔍 化学依据分析")
+    
     st.markdown("""
     **集成TeachOpenCADD T004(化合物相似性) + T033(分子表示方法)**
     - 🧬 基于化学相似性的活性验证

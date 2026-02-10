@@ -179,20 +179,6 @@ except ImportError as e:
     st.sidebar.warning(f"⚠️ GNN预测器导入失败: {error_msg[:80]}...")
     logging.error(f"GNN预测器导入失败: {e}")
 
-# ========== 新增导入 ==========
-try:
-    from advanced_chem_insight import (  # type: ignore
-        render_advanced_chem_insight,
-        AdvancedChemInsightEngine
-    )
-    ADVANCED_CHEM_INSIGHT_AVAILABLE = True
-    st.sidebar.success("✅ 高级化学洞察模块就绪")
-    logging.info("高级化学洞察模块导入成功")
-except ImportError as e:
-    ADVANCED_CHEM_INSIGHT_AVAILABLE = False
-    st.sidebar.warning(f"⚠️ 高级化学洞察模块未加载: {e}")
-    logging.warning(f"高级化学洞察模块导入失败: {e}")
-
 # ========== 化学洞察安全模块导入 ==========
 try:
     from chem_insight_safe import render_safe_chem_insight
@@ -446,10 +432,9 @@ def compare_results(rf_result, gnn_result):
                 """)
 
 # ========== 5. 主界面 - 标签页设计 ==========
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "🧪 分子预测",
     "🔍 化学依据",
-    "🔬 高级分析",       # 高级T004分析
     "📊 模型分析",
     "📚 关于项目"
 ])
@@ -629,14 +614,7 @@ with tab2:
         st.error("化学洞察模块不可用")
         st.code("请确保 chem_insight_safe.py 和 molecule_utils.py 文件存在")
 
-with tab3:  # 新增的高级分析标签页
-    if ADVANCED_CHEM_INSIGHT_AVAILABLE:
-        render_advanced_chem_insight()  # 高级版
-    else:
-        st.warning("高级化学洞察模块未加载")
-        st.code("请确保 advanced_chem_insight.py 文件存在")
-
-with tab4:
+with tab3:
     st.header("📊 模型性能分析")
 
     rf_perf = get_model_performance('rf')
@@ -682,7 +660,7 @@ with tab4:
 
     st.table(pd.DataFrame(advice_data))
 
-with tab5:
+with tab4:
     st.header("🔬 技术实现详情")
 
     st.markdown("""
@@ -792,7 +770,6 @@ with st.sidebar:
 
     st.write(f"- 随机森林: {rf_status}")
     st.write(f"- GNN模型: {gnn_status}")
-    st.write(f"- 高级化学分析: {'✅ 在线' if ADVANCED_CHEM_INSIGHT_AVAILABLE else '❌ 离线'}")
 
     # 使用统计
     st.subheader("📈 使用统计")
