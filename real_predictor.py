@@ -6,9 +6,16 @@ import numpy as np
 import json
 import os
 import sys
-from rdkit import Chem
-from rdkit.Chem import Descriptors
-import pandas as pd
+import re
+
+# 尝试导入RDKit，如果不可用则设置标志
+try:
+    from rdkit import Chem
+    from rdkit.Chem import Descriptors
+    RDKIT_AVAILABLE = True
+except ImportError:
+    RDKIT_AVAILABLE = False
+    print("⚠️ RDKit 不可用，将使用备用分子分析方法")
 
 # 添加当前目录到路径，以便导入重建脚本
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -159,22 +166,79 @@ class RealEGFRPredictor:
         """将SMILES转换为模型所需的特征向量"""
         if not self.model:
             return None
+        
+        # 如果有RDKit，使用RDKit计算特征
+        if RDKIT_AVAILABLE:
+            mol = Chem.MolFromSmiles(smiles)
+            if not mol:
+                print(f"❌ 无效的SMILES: {smiles}")
+                return None
             
-        mol = Chem.MolFromSmiles(smiles)
-        if not mol:
-            print(f"❌ 无效的SMILES: {smiles}")
-            return None
+            features = []
+            for feat_name in self.feature_names:
+                try:
+                    func = getattr(Descriptors, feat_name)
+                    value = func(mol)
+                    features.append(float(value) if value is not None and not (isinstance(value, float) and np.isnan(value)) else 0.0)
+                except:
+                    features.append(0.0)
+            
+            return np.array(features).reshape(1, -1)
+        else:
+            # 无RDKit时，使用简单SMILES分析
+            return self._smiles_to_features_simple(smiles)
+    
+    def _smiles_to_features_simple(self, smiles):
+        """简单的SMILES特征提取（不依赖RDKit）"""
+        length = len(smiles)
         
-        features = []
-        for feat_name in self.feature_names:
-            try:
-                # 获取RDKit计算函数
-                func = getattr(Descriptors, feat_name)
-                value = func(mol)
-                features.append(float(value) if not pd.isna(value) else 0.0)
-            except:
-                features.append(0.0)
+        # 原子计数（粗略估计）
+        c_count = smiles.count('C') - smiles.count('Cl')
+        n_count = smiles.count('N')
+        o_count = smiles.count('O')
+        s_count = smiles.count('S')
+        f_count = smiles.count('F')
+        cl_count = smiles.count('Cl')
+        br_count = smiles.count('Br')
         
+        # 键计数
+        double_bonds = smiles.count('=')
+        triple_bonds = smiles.count('#')
+        
+        # 分支
+        branch_start = smiles.count('(')
+        branch_end = smiles.count(')')
+        
+        # 环
+        ring_digits = sum(1 for c in smiles if c.isdigit())
+        rings = ring_digits // 2
+        
+        # 芳香性
+        aromatic_c = smiles.count('c')
+        aromatic_n = smiles.count('n')
+        aromatic_o = smiles.count('o')
+        
+        # 根据 feature_names 的顺序返回特征
+        feature_map = {
+            "SMILES长度": length,
+            "碳原子数": max(c_count, 0),
+            "氮原子数": n_count,
+            "氧原子数": o_count,
+            "硫原子数": s_count,
+            "氟原子数": f_count,
+            "氯原子数": cl_count,
+            "溴原子数": br_count,
+            "双键数": double_bonds,
+            "三键数": triple_bonds,
+            "分支开始": branch_start,
+            "分支结束": branch_end,
+            "环数": rings,
+            "芳香碳": aromatic_c,
+            "芳香氮": aromatic_n,
+            "芳香氧": aromatic_o
+        }
+        
+        features = [feature_map.get(name, 0.0) for name in self.feature_names]
         return np.array(features).reshape(1, -1)
     
     def predict(self, smiles):
