@@ -43,9 +43,22 @@ plip>=2.2.0
 requests>=2.31.0
 
 # ========== 注意事项 ==========
-# 1. 如果遇到依赖冲突，在云端运行以下命令修复：
-#    pip uninstall streamlit rich markdown-it-py pygments -y
-#    pip install "rich==13.7.1" "markdown-it-py<3" "pygments<3.0.0,>=2.13.0" "streamlit==1.29.0"
-# 2. PLIP 在某些云端环境（如 Streamlit Cloud）可能无法安装
-#    代码已支持降级模式：PLIP 不可用时仍可使用 3D 可视化
+# 【云端部署时遇到依赖冲突的解决方案】
+#
+# 方案1：使用 constraints.txt（推荐）
+#   pip install -r requirements.txt --constraint constraints.txt
+#
+# 方案2：手动修复冲突
+#   pip uninstall streamlit rich markdown-it-py pygments -y
+#   pip install "rich==13.7.1" "markdown-it-py<3" "pygments<3.0.0,>=2.13.0" "streamlit==1.29.0"
+#
+# 方案3：分步安装（最可靠）
+#   步骤1: pip install "rich==13.7.1" "markdown-it-py<3" "pygments<3.0.0,>=2.13.0"
+#   步骤2: pip install "streamlit==1.29.0"
+#   步骤3: pip install -r requirements.txt --no-deps
+#   步骤4: pip install --force-reinstall -r requirements.txt
+#
+# 【PLIP 安装问题】
+# PLIP 在某些云端环境（如 Streamlit Cloud）可能无法安装
+# 如果安装失败，代码支持降级模式：PLIP 不可用时仍可使用 3D 可视化
 

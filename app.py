@@ -894,6 +894,27 @@ with st.sidebar:
     st.write("Streamlit: 1.28.0")
     st.write(f"工作目录: {os.getcwd()}")
 
+    # 依赖冲突检查
+    with st.expander("🔍 依赖状态检查"):
+        try:
+            import pkg_resources
+            rich_version = pkg_resources.get_distribution("rich").version
+            streamlit_version = pkg_resources.get_distribution("streamlit").version
+
+            # 检查版本冲突
+            if int(rich_version.split('.')[0]) >= 14:
+                st.error(f"❌ 依赖冲突: rich={rich_version} 与 streamlit={streamlit_version} 不兼容")
+                st.markdown("""
+                **解决方法**:
+                ```bash
+                pip install "rich==13.7.1" --force-reinstall
+                ```
+                """)
+            else:
+                st.success(f"✅ 依赖版本正常: rich={rich_version}, streamlit={streamlit_version}")
+        except Exception as e:
+            st.warning(f"⚠️ 无法检查依赖状态: {e}")
+
 # ========== 7. 页脚 ==========
 st.markdown("---")
 st.markdown(
