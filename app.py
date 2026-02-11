@@ -263,7 +263,7 @@ except ImportError as e:
     st.sidebar.warning(f"⚠️ GNN预测器导入失败: {error_msg[:80]}...")
     logging.error(f"GNN预测器导入失败: {e}")
 
-# ========== 化学洞察安全模块导入 ==========
+# 化学洞察安全模块导入
 try:
     from chem_insight_safe import render_safe_chem_insight
     CHEM_INSIGHT_AVAILABLE = True
@@ -273,6 +273,17 @@ except ImportError as e:
     CHEM_INSIGHT_AVAILABLE = False
     st.sidebar.warning(f"⚠️ 化学洞察模块导入失败: {e}")
     logging.warning(f"化学洞察模块导入失败: {e}")
+
+# 药物筛选模块导入
+try:
+    from chem_filter import ADMEFilter, SubstructureFilter
+    FILTER_AVAILABLE = True
+    st.sidebar.success("✅ 药物筛选模块就绪")
+    logging.info("药物筛选模块导入成功")
+except ImportError:
+    FILTER_AVAILABLE = False
+    st.sidebar.warning("⚠️ 药物筛选模块未加载")
+    logging.warning("药物筛选模块导入失败")
 
 # 药效团模块状态显示（侧边栏）
 if PHARMACOPHORE_AVAILABLE:
@@ -522,13 +533,14 @@ def compare_results(rf_result, gnn_result):
                 """)
 
 # ========== 5. 主界面 - 标签页设计 ==========
-tab1, tab2, tab3, tab4, tab5, tab7, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs([
     "🧪 分子预测",
     "🔍 化学依据",
     "🎯 药效团设计",
     "📊 模型分析",
+    "🔗 3D结构",
+    "🛡️ 药物筛选",
     "🔬 技术详情",
-    "🔗 3D结构",   # 新增
     "📚 关于项目"
 ])
 
@@ -902,6 +914,179 @@ with tab7:
                 * `1M17`: EGFR + 埃罗替尼 (Erlotinib)
                 * `2ITY`: EGFR + 吉非替尼 (Gefitinib)
                 """)
+
+with tab8:
+    st.header("🛡️ 药物类属性与安全性筛选")
+
+    if not FILTER_AVAILABLE:
+        st.error("筛选模块未加载，请检查 chem_filter.py 文件")
+    else:
+        # 初始化筛选器
+        adme_tool = ADMEFilter()
+        struct_tool = SubstructureFilter()
+
+        st.markdown("""
+        本模块用于评估化合物的成药潜力，包括：
+        1.  **ADME/Ro5**: Lipinski 五规则 (分子量、亲脂性、氢键供体/受体)
+        2.  **毒性警报**: 筛查 PAINS (泛测定干扰化合物) 和 Brenk 不良子结构
+        """)
+
+        # 两个模式：单分子 vs 批量
+        mode = st.radio("选择模式", ["单分子分析 (当前SMILES)", "批量数据集筛选"], horizontal=True)
+
+        # --- 模式 1: 单分子分析 ---
+        if mode == "单分子分析 (当前SMILES)":
+            current_smiles = st.session_state.get('last_smiles', '')
+
+            if not current_smiles:
+                st.info("请先在「🧪 分子预测」页面输入并预测一个分子，或在下方手动输入。")
+                current_smiles = st.text_input("输入 SMILES", value="CCOc1cc2ncnc(Nc3cccc(Br)c3)c2cc1OCC")
+            else:
+                st.write(f"**当前分析分子**: `{current_smiles}`")
+
+            if current_smiles and st.button("开始评估", type="primary"):
+                col_res1, col_res2 = st.columns(2)
+
+                # 1. Ro5 分析
+                with col_res1:
+                    st.subheader("1. Lipinski 五规则 (Ro5)")
+                    ro5_res = adme_tool.calculate_ro5_properties(current_smiles)
+
+                    if ro5_res['MW'] is not None:
+                        # 使用 DataFrame 展示并高亮
+                        res_df = pd.DataFrame(ro5_res).T
+                        # 格式化
+                        st.dataframe(res_df.style.format("{:.2f}", subset=["MW", "LogP"]), use_container_width=True)
+
+                        if ro5_res['Pass_Ro5']:
+                            st.success("✅ **通过 Ro5 筛选** (违反规则数 <= 1)")
+                        else:
+                            st.error("❌ **未通过 Ro5 筛选** (违反规则数 > 1)")
+
+                        # 详细指标检查
+                        st.caption("规则详情:")
+                        st.write(f"- 分子量 {'✅' if ro5_res['MW']<=500 else '❌'} (≤500): {ro5_res['MW']:.1f}")
+                        st.write(f"- LogP {'✅' if ro5_res['LogP']<=5 else '❌'} (≤5): {ro5_res['LogP']:.2f}")
+                        st.write(f"- HBA {'✅' if ro5_res['HBA']<=10 else '❌'} (≤10): {ro5_res['HBA']}")
+                        st.write(f"- HBD {'✅' if ro5_res['HBD']<=5 else '❌'} (≤5): {ro5_res['HBD']}")
+                    else:
+                        st.error("无法计算理化性质")
+
+                # 2. 子结构分析
+                with col_res2:
+                    st.subheader("2. 不良子结构警报")
+                    struct_res = struct_tool.check_single_molecule(current_smiles)
+
+                    if "error" in struct_res:
+                        st.error("SMILES 解析错误")
+                    else:
+                        # PAINS
+                        if struct_res["PAINS_found"]:
+                            st.error(f"⚠️ **发现 PAINS 警报**: {', '.join(struct_res['PAINS_names'])}")
+                            st.warning("PAINS (Pan Assay Interference Compounds) 可能会导致实验假阳性。")
+                        else:
+                            st.success("✅ 未发现 PAINS 结构")
+
+                        st.markdown("---")
+
+                        # Brenk
+                        if struct_res["Brenk_found"]:
+                            st.warning(f"⚠️ **发现 Brenk 不良结构**: {', '.join(struct_res['Brenk_names'])}")
+                            st.caption("这些结构可能具有毒性、代谢不稳定性或化学反应性。")
+                        else:
+                            st.success("✅ 未发现 Brenk 不良结构")
+
+        # --- 模式 2: 批量筛选 ---
+        else:
+            uploaded_csv = st.file_uploader("上传分子列表 CSV (需包含 smiles 列)", type="csv")
+
+            if uploaded_csv:
+                df = pd.read_csv(uploaded_csv)
+                st.write(f"已加载 {len(df)} 个分子")
+
+                # 列名识别
+                cols = df.columns.tolist()
+                smiles_col = st.selectbox("选择 SMILES 列", cols, index=cols.index('smiles') if 'smiles' in cols else 0)
+
+                if st.button("运行批量筛选"):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    # 1. 计算 Ro5
+                    status_text.text("正在计算 ADME 属性...")
+                    progress_bar.progress(30)
+
+                    # 使用 apply 进行批量计算
+                    ro5_data = df[smiles_col].apply(adme_tool.calculate_ro5_properties)
+                    df_result = pd.concat([df, ro5_data], axis=1)
+
+                    # 2. 结构筛选
+                    status_text.text("正在扫描不良子结构 (PAINS/Brenk)...")
+                    progress_bar.progress(60)
+
+                    df_clean, df_full_labeled, n_pains, n_brenk = struct_tool.filter_dataframe(df_result, smiles_col)
+
+                    progress_bar.progress(100)
+                    status_text.text("✅ 筛选完成")
+
+                    # --- 结果展示 ---
+                    st.divider()
+                    col_stat1, col_stat2, col_stat3 = st.columns(3)
+
+                    # 统计卡片
+                    total = len(df)
+                    pass_ro5 = df_result['Pass_Ro5'].sum()
+                    pass_all = len(df_clean)
+
+                    col_stat1.metric("初始分子数", total)
+                    col_stat2.metric("通过 Ro5", f"{pass_ro5} ({pass_ro5/total*100:.1f}%)")
+                    col_stat3.metric("最终通过筛选", f"{pass_all} ({pass_all/total*100:.1f}%)")
+
+                    # 详细图表
+                    st.subheader("📊 筛选分析报告")
+
+                    viz_col1, viz_col2 = st.columns(2)
+
+                    with viz_col1:
+                        st.markdown("**物理化学空间分布 (通过分子)**")
+                        # 绘制雷达图
+                        clean_stats = df_clean[["MW", "HBA", "HBD", "LogP"]].describe().T
+                        fig_radar = adme_tool.plot_radar_chart(clean_stats, "Filtered Candidates Profile")
+                        if fig_radar:
+                            st.pyplot(fig_radar)
+
+                    with viz_col2:
+                        st.markdown("**淘汰原因统计**")
+                        # 简单的柱状图
+                        reasons = {
+                            "违反 Ro5": total - pass_ro5,
+                            "含 PAINS": n_pains,
+                            "含 Brenk": n_brenk
+                        }
+                        st.bar_chart(pd.Series(reasons))
+
+                    # 数据下载
+                    st.subheader("📥 结果下载")
+
+                    tab_clean, tab_full = st.tabs(["✅ 通过筛选的分子", "📑 完整带标注数据"])
+
+                    with tab_clean:
+                        st.dataframe(df_clean.head())
+                        st.download_button(
+                            "下载筛选后的分子 (CSV)",
+                            df_clean.to_csv(index=False).encode('utf-8'),
+                            "filtered_clean_molecules.csv",
+                            "text/csv"
+                        )
+
+                    with tab_full:
+                        st.dataframe(df_full_labeled.head())
+                        st.download_button(
+                            "下载完整报告 (CSV)",
+                            df_full_labeled.to_csv(index=False).encode('utf-8'),
+                            "full_screening_report.csv",
+                            "text/csv"
+                        )
 
 with tab6:
     st.header("📚 关于项目")
