@@ -895,25 +895,109 @@ with st.sidebar:
     st.write(f"工作目录: {os.getcwd()}")
 
     # 依赖冲突检查
-    with st.expander("🔍 依赖状态检查"):
-        try:
-            import pkg_resources
-            rich_version = pkg_resources.get_distribution("rich").version
-            streamlit_version = pkg_resources.get_distribution("streamlit").version
+    with st.expander("🔍 环境诊断"):
+        st.markdown("### 当前环境包状态")
+        import pkg_resources
+        import subprocess
 
-            # 检查版本冲突
-            if int(rich_version.split('.')[0]) >= 14:
-                st.error(f"❌ 依赖冲突: rich={rich_version} 与 streamlit={streamlit_version} 不兼容")
-                st.markdown("""
-                **解决方法**:
-                ```bash
-                pip install "rich==13.7.1" --force-reinstall
-                ```
-                """)
+        # 定义关键包及其期望版本
+        key_packages = {
+            "streamlit": "1.29.0",
+            "rich": "13.7.1",
+            "markdown-it-py": "2.2.0",
+            "pygments": "2.17.2",
+            "ipywidgets": "7.6.3",
+            "py3Dmol": "2.0.0.post2",
+            "plip": ">=2.2.0",
+            "rdkit-pypi": "2022.9.5",
+            "stmol": "❌ 不应存在（已移除）"
+        }
+
+        # 显示包状态表格
+        package_data = []
+        for pkg, expected_version in key_packages.items():
+            try:
+                actual_version = pkg_resources.get_distribution(pkg).version
+                # 检查版本是否匹配
+                if pkg == "stmol":
+                    status = "❌ 冲突"
+                    actual_version = f"{actual_version} (应移除)"
+                elif pkg == "plip":
+                    status = "✅ 正常"
+                else:
+                    expected_parts = expected_version.split('.')
+                    actual_parts = actual_version.split('.')
+                    status = "✅ 正常" if actual_parts[:2] == expected_parts[:2] else "⚠️ 可能不兼容"
+
+                package_data.append({
+                    "包名": pkg,
+                    "当前版本": actual_version,
+                    "期望版本": expected_version,
+                    "状态": status
+                })
+            except pkg_resources.DistributionNotFound:
+                if pkg == "stmol":
+                    package_data.append({
+                        "包名": pkg,
+                        "当前版本": "未安装",
+                        "期望版本": "❌ 不应存在",
+                        "状态": "✅ 正常"
+                    })
+                elif pkg == "plip":
+                    package_data.append({
+                        "包名": pkg,
+                        "当前版本": "未安装",
+                        "期望版本": expected_version,
+                        "状态": "⚠️ 降级模式"
+                    })
+                else:
+                    package_data.append({
+                        "包名": pkg,
+                        "当前版本": "未安装",
+                        "期望版本": expected_version,
+                        "状态": "❌ 缺失"
+                    })
+
+        df_packages = pd.DataFrame(package_data)
+        st.dataframe(df_packages, use_container_width=True, hide_index=True)
+
+        # 检查依赖冲突
+        st.markdown("### 依赖冲突检查")
+        try:
+            result = subprocess.run(
+                ["pip", "check"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                st.success("✅ 无依赖冲突")
             else:
-                st.success(f"✅ 依赖版本正常: rich={rich_version}, streamlit={streamlit_version}")
+                st.error("❌ 发现依赖冲突:")
+                st.code(result.stdout, language="bash")
         except Exception as e:
-            st.warning(f"⚠️ 无法检查依赖状态: {e}")
+            st.warning(f"⚠️ 无法检查依赖冲突: {e}")
+
+        # 提供修复建议
+        st.markdown("### 修复建议")
+        if any(row["状态"] in ["❌ 缺失", "❌ 冲突", "⚠️ 可能不兼容"] for _, row in df_packages.iterrows()):
+            st.warning("检测到依赖问题，请执行以下修复步骤:")
+            st.code("""
+# Windows 用户:
+fix_cloud_dependencies.bat
+
+# Linux/Mac 用户:
+bash fix_cloud_dependencies.sh
+
+# 或手动执行:
+python -m pip install --upgrade pip
+pip uninstall -y streamlit stmol rich markdown-it-py pygments ipywidgets plip py3Dmol
+pip install "rich==13.7.1" "markdown-it-py==2.2.0" "pygments==2.17.2" "ipywidgets==7.6.3"
+pip install "streamlit==1.29.0"
+pip install -r requirements.txt
+            """, language="bash")
+        else:
+            st.success("🎉 所有依赖状态正常！")
 
 # ========== 7. 页脚 ==========
 st.markdown("---")

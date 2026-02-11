@@ -246,27 +246,11 @@ class StreamlitProteinLigandAnalyzer:
             PDB ID（用于在线加载）
         highlight_residues : list
             要高亮的残基编号列表
-            
-        Returns
-        -------
-        stmol组件
         """
         if not PY3DMOL_AVAILABLE:
-            st.error("❌ 3D可视化模块（py3Dmol）未安装")
-            st.info("""
-            **py3Dmol 安装说明**:
-
-            ```bash
-            pip install py3Dmol
-            ```
-
-            如果安装失败，请尝试：
-            ```bash
-            pip install --upgrade pip
-            pip install py3Dmol
-            ```
-            """)
-            return None
+            st.error("❌ py3Dmol未安装，无法显示3D结构")
+            st.info("请运行: pip install py3Dmol==2.0.0.post2")
+            return
 
         if pdb_id and not self.pdb_file_path:
             # 在线加载PDB
