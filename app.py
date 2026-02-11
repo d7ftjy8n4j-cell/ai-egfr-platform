@@ -50,6 +50,15 @@ import joblib
 import json
 import re
 
+# ========== 3D结构可视化导入 ==========
+try:
+    from structure_viz import StructureVisualizer
+    from stmol import showmol
+    VIZ_AVAILABLE = True
+except ImportError:
+    VIZ_AVAILABLE = False
+    logging.warning("3D可视化依赖缺失 (stmol, py3DMol)")
+
 # ========== 配置类 ==========
 class Config:
     """集中管理系统配置"""
@@ -508,12 +517,13 @@ def compare_results(rf_result, gnn_result):
                 """)
 
 # ========== 5. 主界面 - 标签页设计 ==========
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab7, tab6 = st.tabs([
     "🧪 分子预测",
-    "🔍 化学依据",  # T004+T033
-    "🎯 药效团设计",  # 新增：T009
+    "🔍 化学依据",
+    "🎯 药效团设计",
     "📊 模型分析",
     "🔬 技术详情",
+    "🔗 3D结构",   # 新增
     "📚 关于项目"
 ])
 
@@ -792,59 +802,99 @@ with tab5:
     | **创新性** | 传统 | 前沿 | GNN代表AI趋势 |
     """)
 
-with tab5:
-    st.header("🔬 技术实现详情")
+with tab7:
+    st.header("🔗 蛋白质-配体 3D 结构可视化")
+    
+    if not VIZ_AVAILABLE:
+        st.error("⚠️ 缺少可视化组件。请在 requirements.txt 中添加 `stmol` 和 `py3Dmol`。")
+    else:
+        # 布局：左侧控制，右侧显示
+        col_ctrl, col_view = st.columns([1, 3])
+        
+        # 初始化 Session State 用于存储 PDB 数据
+        if 'viz_pdb_id' not in st.session_state:
+            st.session_state.viz_pdb_id = "3POZ"
+        if 'viz_data_loaded' not in st.session_state:
+            st.session_state.viz_data_loaded = False
+        
+        # --- 左侧控制栏 ---
+        with col_ctrl:
+            st.subheader("1. 数据加载")
+            input_mode = st.radio("来源:", ["PDB ID", "上传文件"])
+            
+            viz_tool = StructureVisualizer()
+            load_success = False
+            
+            if input_mode == "PDB ID":
+                pdb_input = st.text_input("输入 ID", value=st.session_state.viz_pdb_id).upper()
+                if st.button("📥 加载 PDB", use_container_width=True):
+                    with st.spinner("下载中..."):
+                        if viz_tool.load_from_pdb_id(pdb_input):
+                            st.session_state.viz_pdb_id = pdb_input
+                            st.session_state.viz_data_loaded = True
+                            st.session_state.viz_data_source = "remote"
+                            # 将数据存入 session 以便重绘时无需重新下载
+                            st.session_state.viz_raw_data = viz_tool.pdb_data
+                            load_success = True
+                        else:
+                            st.error("无效的 PDB ID")
+            else:
+                uploaded_file = st.file_uploader("上传 .pdb", type="pdb")
+                if uploaded_file:
+                    viz_tool.load_from_file(uploaded_file)
+                    st.session_state.viz_data_loaded = True
+                    st.session_state.viz_data_source = "local"
+                    st.session_state.viz_raw_data = viz_tool.pdb_data
+                    load_success = True
 
-    st.markdown("""
-    ### 🏗️ 系统架构
+            st.markdown("---")
+            st.subheader("2. 样式设置")
+            
+            # 从 Session 恢复数据 (如果只是调整样式，不需要重新下载)
+            if st.session_state.viz_data_loaded and not load_success:
+                viz_tool.pdb_data = st.session_state.viz_raw_data
+                viz_tool.pdb_id = st.session_state.get('viz_pdb_id', 'Unknown')
+            
+            style_select = st.selectbox("蛋白样式", ["cartoon", "stick", "line", "sphere"], index=0)
+            color_select = st.selectbox("配色方案", ["spectrum", "chain", "residue"], index=0)
+            
+            show_ligand = st.toggle("显示配体/药物", value=True)
+            show_surface = st.toggle("显示蛋白表面", value=False)
+            
+            surface_opacity = 0.5
+            if show_surface:
+                surface_opacity = st.slider("表面透明度", 0.0, 1.0, 0.5, 0.1)
 
-    **双引擎预测架构**:
-    ```
-    输入层 (SMILES)
-        ├── 随机森林分支 → RDKit特征提取 → 随机森林模型 → 预测结果
-        └── GNN分支 → 分子图转换 → 图卷积网络 → 预测结果
-        └── 药效团分支 → 分子3D结构 → 药效团识别 → 配体设计
-    ```
-
-    ### 🔧 技术栈
-
-    | 组件 | 技术选择 | 用途 |
-    |------|----------|------|
-    | **前端界面** | Streamlit | 交互式Web应用 |
-    | **传统ML** | Scikit-learn + RDKit | 随机森林模型训练与预测 |
-    | **深度学习** | PyTorch + PyTorch Geometric | GNN模型训练与预测 |
-    | **3D可视化** | py3Dmol, stmol | 分子3D结构展示 |
-    | **药效团** | RDKit + 药效团库 | 药效团识别与设计 |
-    | **化学计算** | RDKit | 分子特征计算与可视化 |
-    | **数据管理** | Pandas + NumPy | 数据处理与分析 |
-
-    ### 📐 特征工程对比
-
-    **随机森林特征** (200+维度):
-    - 物理化学性质: LogP, 分子量, 氢键供体/受体等
-    - 结构特征: 芳香环数, 可旋转键数, 拓扑极性表面积等
-    - 原子计数: C, N, O, F等原子类型统计
-
-    **GNN特征** (12维原子特征):
-    - 原子级特征: 原子序数, 杂化类型, 形式电荷, 芳香性等
-    - 键级特征: 键类型, 共轭性, 环内键等
-    - 通过图卷积层自动学习分子结构表示
-
-    **药效团特征**:
-    - 空间特征: 氢键供体/受体, 疏水区域, 芳香环等
-    - 3D约束: 距离限制, 角度限制
-    - 药效团模型: 基于已知活性化合物提取
-
-    ### 🎯 模型性能
-
-    | 指标 | 随机森林 | GNN | 说明 |
-    |------|----------|-----|------|
-    | **AUC** | 0.855 | 0.808 | 随机森林略优 |
-    | **准确率** | 0.830 | 0.765 | 随机森林更稳定 |
-    | **可解释性** | 高 | 中 | RF有特征重要性 |
-    | **泛化能力** | 强 | 较强 | 均表现良好 |
-    | **创新性** | 传统 | 前沿 | GNN代表AI趋势 |
-    """)
+        # --- 右侧显示区 ---
+        with col_view:
+            if st.session_state.viz_data_loaded:
+                st.info(f"正在查看: **{viz_tool.pdb_id}**")
+                
+                # 生成视图
+                try:
+                    view = viz_tool.render_view(
+                        style=style_select,
+                        color_scheme=color_select,
+                        show_ligand=show_ligand,
+                        show_surface=show_surface,
+                        surface_opacity=surface_opacity
+                    )
+                    # 在 Streamlit 中显示
+                    showmol(view, height=600, width=800)
+                    
+                    st.caption("💡 操作提示: 鼠标左键旋转，右键/Ctrl+左键平移，滚轮缩放。")
+                    
+                except Exception as e:
+                    st.error(f"渲染失败: {e}")
+            else:
+                # 初始空状态占位
+                st.info("👈 请在左侧加载蛋白质结构")
+                st.markdown("""
+                **推荐的 EGFR 相关结构:**
+                * `3POZ`: EGFR 激酶结构域 + 抑制剂 Tak-285
+                * `1M17`: EGFR + 埃罗替尼 (Erlotinib)
+                * `2ITY`: EGFR + 吉非替尼 (Gefitinib)
+                """)
 
 with tab6:
     st.header("📚 关于项目")

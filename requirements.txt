@@ -46,6 +46,7 @@ setuptools==68.2.2
 # ========== 3D可视化 ==========
 py3Dmol==2.0.4
 ipython_genutils==0.2.0
+stmol==0.0.9
 
 # 注意：以下包在Streamlit Cloud上会导致依赖冲突或编译失败，暂时禁用
 # nglview>=3.0.3,<4.0.0
