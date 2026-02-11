@@ -190,7 +190,9 @@ except ImportError as e:
     st.sidebar.warning(f"⚠️ 化学洞察模块导入失败: {e}")
     logging.warning(f"化学洞察模块导入失败: {e}")
 
-# ========== 新增导入 ==========
+# ========== 药效团模块导入 ==========
+# 添加当前目录到Python路径
+sys.path.append(Config.BASE_DIR)
 try:
     from pharmacophore_streamlit import render_pharmacophore_tab
     PHARMACOPHORE_AVAILABLE = True

@@ -14,7 +14,11 @@ import json
 import matplotlib.pyplot as plt
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw, rdMolDescriptors
-from rdkit.Chem import rdShapeHelpers
+# rdShapeHelpers 在某些RDKit版本中可能不可用，尝试导入但不强制要求
+try:
+    from rdkit.Chem import rdShapeHelpers
+except ImportError:
+    rdShapeHelpers = None
 import py3Dmol
 from stmol import showmol
 import warnings
