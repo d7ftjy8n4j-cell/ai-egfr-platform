@@ -9,6 +9,15 @@ import sys
 import os
 import logging
 from datetime import datetime
+import subprocess
+
+# 尝试导入 pkg_resources，如果失败则使用备用方案
+try:
+    import pkg_resources
+    PKG_RESOURCES_AVAILABLE = True
+except ImportError:
+    PKG_RESOURCES_AVAILABLE = False
+    logging.warning("pkg_resources 不可用，环境诊断功能将受限")
 
 # ========== 设置页面（必须在任何Streamlit命令之前） ==========
 import streamlit as st
@@ -166,13 +175,30 @@ try:
     RF_PREDICTOR_AVAILABLE = True
     st.sidebar.success("✅ 随机森林预测器就绪")
     logging.info("随机森林预测器导入成功")
+except ModuleNotFoundError as e:
+    RF_PREDICTOR_AVAILABLE = False
+    error_msg = str(e)
+    if "numpy" in error_msg or "numpy._core" in error_msg:
+        st.sidebar.error(f"❌ 随机森林预测器不可用")
+        st.sidebar.info("ℹ️ 云端numpy版本与模型不兼容，请使用GNN预测器")
+        logging.error(f"RF预测器numpy版本问题: {e}")
+    else:
+        st.sidebar.error(f"❌ 随机森林预测器初始化失败")
+        st.sidebar.warning(f"缺少模块: {error_msg}")
+        logging.error(f"RF预测器缺失模块: {e}")
 except Exception as e:
     RF_PREDICTOR_AVAILABLE = False
-    st.sidebar.error(f"❌ 随机森林预测器初始化失败")
-    st.sidebar.warning(f"错误详情: {str(e)[:100]}...")
-    logging.error(f"随机森林预测器失败: {e}")
+    error_msg = str(e)
+    if "numpy" in error_msg.lower():
+        st.sidebar.error(f"❌ 随机森林预测器不可用")
+        st.sidebar.info("ℹ️ 云端numpy版本与模型不兼容，请使用GNN预测器")
+        logging.error(f"RF预测器numpy问题: {e}")
+    else:
+        st.sidebar.error(f"❌ 随机森林预测器初始化失败")
+        st.sidebar.warning(f"错误: {error_msg[:80]}...")
+        logging.error(f"RF预测器错误: {e}")
     import traceback
-    traceback.print_exc()
+    logging.error(traceback.format_exc())
 
 # 导入GNN预测器
 try:
@@ -897,92 +923,95 @@ with st.sidebar:
     # 依赖冲突检查
     with st.expander("🔍 环境诊断"):
         st.markdown("### 当前环境包状态")
-        import pkg_resources
-        import subprocess
 
-        # 定义关键包及其期望版本
-        key_packages = {
-            "streamlit": "1.29.0",
-            "rich": "13.7.1",
-            "markdown-it-py": "2.2.0",
-            "pygments": "2.17.2",
-            "ipywidgets": "7.6.3",
-            "py3Dmol": "2.0.0.post2",
-            "plip": ">=2.2.0",
-            "rdkit-pypi": "2022.9.5",
-            "stmol": "❌ 不应存在（已移除）"
-        }
+        if not PKG_RESOURCES_AVAILABLE:
+            st.warning("⚠️ pkg_resources 模块不可用，无法检查包版本")
+            st.info("请运行以下命令检查环境:")
+            st.code("pip list | grep -E '(streamlit|rich|ipywidgets)'", language="bash")
+        else:
+            # 定义关键包及其期望版本
+            key_packages = {
+                "streamlit": "1.29.0",
+                "rich": "13.7.1",
+                "markdown-it-py": "2.2.0",
+                "pygments": "2.17.2",
+                "ipywidgets": "7.6.3",
+                "py3Dmol": "2.0.0.post2",
+                "plip": ">=2.2.0",
+                "rdkit-pypi": "2022.9.5",
+                "stmol": "❌ 不应存在（已移除）"
+            }
 
-        # 显示包状态表格
-        package_data = []
-        for pkg, expected_version in key_packages.items():
+            # 显示包状态表格
+            package_data = []
+            for pkg, expected_version in key_packages.items():
+                try:
+                    actual_version = pkg_resources.get_distribution(pkg).version
+                    # 检查版本是否匹配
+                    if pkg == "stmol":
+                        status = "❌ 冲突"
+                        actual_version = f"{actual_version} (应移除)"
+                    elif pkg == "plip":
+                        status = "✅ 正常"
+                    else:
+                        expected_parts = expected_version.split('.')
+                        actual_parts = actual_version.split('.')
+                        status = "✅ 正常" if actual_parts[:2] == expected_parts[:2] else "⚠️ 可能不兼容"
+
+                    package_data.append({
+                        "包名": pkg,
+                        "当前版本": actual_version,
+                        "期望版本": expected_version,
+                        "状态": status
+                    })
+                except pkg_resources.DistributionNotFound:
+                    if pkg == "stmol":
+                        package_data.append({
+                            "包名": pkg,
+                            "当前版本": "未安装",
+                            "期望版本": "❌ 不应存在",
+                            "状态": "✅ 正常"
+                        })
+                    elif pkg == "plip":
+                        package_data.append({
+                            "包名": pkg,
+                            "当前版本": "未安装",
+                            "期望版本": expected_version,
+                            "状态": "⚠️ 降级模式"
+                        })
+                    else:
+                        package_data.append({
+                            "包名": pkg,
+                            "当前版本": "未安装",
+                            "期望版本": expected_version,
+                            "状态": "❌ 缺失"
+                        })
+
+            df_packages = pd.DataFrame(package_data)
+            st.dataframe(df_packages, use_container_width=True, hide_index=True)
+
+            # 检查依赖冲突
+            st.markdown("### 依赖冲突检查")
             try:
-                actual_version = pkg_resources.get_distribution(pkg).version
-                # 检查版本是否匹配
-                if pkg == "stmol":
-                    status = "❌ 冲突"
-                    actual_version = f"{actual_version} (应移除)"
-                elif pkg == "plip":
-                    status = "✅ 正常"
+                result = subprocess.run(
+                    ["pip", "check"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    st.success("✅ 无依赖冲突")
                 else:
-                    expected_parts = expected_version.split('.')
-                    actual_parts = actual_version.split('.')
-                    status = "✅ 正常" if actual_parts[:2] == expected_parts[:2] else "⚠️ 可能不兼容"
+                    st.error("❌ 发现依赖冲突:")
+                    st.code(result.stdout, language="bash")
+            except Exception as e:
+                st.warning(f"⚠️ 无法检查依赖冲突: {e}")
 
-                package_data.append({
-                    "包名": pkg,
-                    "当前版本": actual_version,
-                    "期望版本": expected_version,
-                    "状态": status
-                })
-            except pkg_resources.DistributionNotFound:
-                if pkg == "stmol":
-                    package_data.append({
-                        "包名": pkg,
-                        "当前版本": "未安装",
-                        "期望版本": "❌ 不应存在",
-                        "状态": "✅ 正常"
-                    })
-                elif pkg == "plip":
-                    package_data.append({
-                        "包名": pkg,
-                        "当前版本": "未安装",
-                        "期望版本": expected_version,
-                        "状态": "⚠️ 降级模式"
-                    })
-                else:
-                    package_data.append({
-                        "包名": pkg,
-                        "当前版本": "未安装",
-                        "期望版本": expected_version,
-                        "状态": "❌ 缺失"
-                    })
-
-        df_packages = pd.DataFrame(package_data)
-        st.dataframe(df_packages, use_container_width=True, hide_index=True)
-
-        # 检查依赖冲突
-        st.markdown("### 依赖冲突检查")
-        try:
-            result = subprocess.run(
-                ["pip", "check"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                st.success("✅ 无依赖冲突")
-            else:
-                st.error("❌ 发现依赖冲突:")
-                st.code(result.stdout, language="bash")
-        except Exception as e:
-            st.warning(f"⚠️ 无法检查依赖冲突: {e}")
-
-        # 提供修复建议
-        st.markdown("### 修复建议")
-        if any(row["状态"] in ["❌ 缺失", "❌ 冲突", "⚠️ 可能不兼容"] for _, row in df_packages.iterrows()):
-            st.warning("检测到依赖问题，请执行以下修复步骤:")
-            st.code("""
+            # 提供修复建议
+            st.markdown("### 修复建议")
+            if any(row["状态"] in ["❌ 缺失", "❌ 冲突", "⚠️ 可能不兼容"] for _, row in df_packages.iterrows()):
+                st.warning("检测到依赖问题，请执行以下修复步骤:")
+                st.code("""
 # Windows 用户:
 fix_cloud_dependencies.bat
 
@@ -995,9 +1024,9 @@ pip uninstall -y streamlit stmol rich markdown-it-py pygments ipywidgets plip py
 pip install "rich==13.7.1" "markdown-it-py==2.2.0" "pygments==2.17.2" "ipywidgets==7.6.3"
 pip install "streamlit==1.29.0"
 pip install -r requirements.txt
-            """, language="bash")
-        else:
-            st.success("🎉 所有依赖状态正常！")
+                """, language="bash")
+            else:
+                st.success("🎉 所有依赖状态正常！")
 
 # ========== 7. 页脚 ==========
 st.markdown("---")
