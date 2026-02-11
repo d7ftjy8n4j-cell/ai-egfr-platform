@@ -319,7 +319,7 @@ class StreamlitPharmacophore:
 def render_pharmacophore_tab():
     """渲染药效团生成标签页"""
     
-    st.header("🎯 药效团模型生成 (TeachOpenCADD T009)")
+    
     st.markdown("""
     从已知活性分子生成集成药效团模型，用于指导分子设计和优化。
     **功能**: 分子加载 → 特征提取 → 聚类 → 药效团生成 → 3D可视化
@@ -651,7 +651,6 @@ CC(=O)OC1=CC=CC=C1C(=O)O"""
 # 独立运行
 if __name__ == "__main__":
     st.set_page_config(
-        page_title="药效团生成器 - TeachOpenCADD T009",
         page_icon="🎯",
         layout="wide"
     )
