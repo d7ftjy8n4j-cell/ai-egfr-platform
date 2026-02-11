@@ -1,13 +1,10 @@
-# ========== 必须首先安装的依赖 ==========
-# 锁定 rich 版本以兼容 Streamlit 1.29.0
-rich==13.7.1
-markdown-it-py==2.2.0
-
 # ========== 核心框架 ==========
 streamlit==1.29.0
 
-# ========== 3D可视化 (核心修复点) ==========
-# stmol 会自动安装它需要的 ipywidgets==7.6.3，千万不要自己手动指定 ipywidgets==8.x！
+# ========== 3D可视化核心修复 ==========
+# 必须显式安装这个包，否则 py3Dmol 会报错
+ipython_genutils==0.2.0
+# 3D 显示组件
 stmol==0.0.9
 py3Dmol==2.0.4
 
@@ -20,24 +17,19 @@ joblib==1.3.2
 # ========== 化学信息学 ==========
 rdkit-pypi==2022.9.5
 
-# ========== PyTorch (CPU版本) ==========
+# ========== PyTorch ==========
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.1.2+cpu
 torchvision==0.16.2+cpu
-torchaudio==2.1.2+cpu
-
-# ========== 图神经网络 ==========
 --find-links https://data.pyg.org/whl/torch-2.1.0+cpu.html
 torch-geometric==2.4.0
 
-# ========== 其他工具 ==========
+# ========== 其他依赖 ==========
+requests==2.31.0
 matplotlib==3.7.5
 pillow==10.1.0
 plotly==5.18.0
-requests==2.31.0
 setuptools==68.2.2
+rich==13.7.1
+markdown-it-py==2.2.0
 
-# ========== 已删除的冲突库 (不要加回来) ==========
-# ipywidgets (已由 stmol 接管)
-# nglview (不兼容云端)
-# plip (不兼容云端)
