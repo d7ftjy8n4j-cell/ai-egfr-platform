@@ -4,14 +4,31 @@ app.py - EGFR抑制剂智能预测系统（双引擎版）
 版本：1.0.0
 """
 
-# ========== 基础导入与设置 ==========
+# ========== 修复导入 ==========
+import sys
+import os
 import streamlit as st
+
+# 添加当前目录到Python路径
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# 尝试导入药效团模块
+try:
+    import pharmacophore_streamlit
+    PHARMACOPHORE_AVAILABLE = True
+    st.sidebar.success("✅ 药效团模块加载成功")
+except ImportError as e:
+    PHARMACOPHORE_AVAILABLE = False
+    st.sidebar.error(f"❌ 药效团模块导入失败: {e}")
+    # 显示详细错误信息
+    import traceback
+    st.sidebar.code(traceback.format_exc())
+
+# 其他导入
 import pandas as pd
 import numpy as np
 import joblib
 import json
-import sys
-import os
 import re
 from datetime import datetime
 import logging
@@ -189,17 +206,6 @@ except ImportError as e:
     CHEM_INSIGHT_AVAILABLE = False
     st.sidebar.warning(f"⚠️ 化学洞察模块导入失败: {e}")
     logging.warning(f"化学洞察模块导入失败: {e}")
-
-# ========== 药效团模块导入 ==========
-try:
-    from pharmacophore_streamlit import render_pharmacophore_tab
-    PHARMACOPHORE_AVAILABLE = True
-    st.sidebar.success("✅ 药效团模块就绪")
-    logging.info("药效团模块导入成功")
-except ImportError as e:
-    PHARMACOPHORE_AVAILABLE = False
-    st.sidebar.warning("⚠️ 药效团模块未加载")
-    logging.warning(f"药效团模块导入失败: {e}")
 
 # ========== 2. 应用标题与介绍 ==========
 st.title("🧬 EGFR抑制剂智能预测系统")
@@ -630,7 +636,7 @@ with tab2:
 with tab3:
     st.header("🎯 药效团设计")
     if PHARMACOPHORE_AVAILABLE:
-        render_pharmacophore_tab()
+        pharmacophore_streamlit.render_pharmacophore_tab()
     else:
         st.error("药效团模块不可用")
         st.code("请确保 pharmacophore_streamlit.py 文件存在")
