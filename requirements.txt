@@ -47,8 +47,6 @@ setuptools==68.2.2
 py3Dmol==2.0.4
 ipython_genutils==0.2.0
 
-# 注意：nglview在Streamlit Cloud上会导致依赖冲突，暂时禁用
+# 注意：以下包在Streamlit Cloud上会导致依赖冲突或编译失败，暂时禁用
 # nglview>=3.0.3,<4.0.0
-
-# ========== 其他 ==========
-plip==2.2.0
+# plip==2.2.0  # 依赖openbabel，需要从源码编译
