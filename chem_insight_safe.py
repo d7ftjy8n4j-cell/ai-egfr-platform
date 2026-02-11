@@ -255,7 +255,7 @@ class SafeChemInsightEngine:
                    ha='center', va='center', fontsize=12, weight='bold')
             ax.text(0.5, 0.5, '• Morgan指纹: 拓扑相似度\n• 原子组成: 元素分析\n• 2D结构: 可视化验证', 
                    ha='center', va='center', fontsize=10)
-            ax.text(0.5, 0.3, 'T004 + T033集成', 
+            ax.text(0.5, 0.3, '化学相似性分析', 
                    ha='center', va='center', fontsize=9, style='italic')
             ax.axis('off')
             ax.set_title('分析原理')
@@ -287,7 +287,7 @@ def render_safe_chem_insight():
     
     
     st.markdown("""
-    **集成TeachOpenCADD T004(化合物相似性) + T033(分子表示方法)**
+    **化学相似性分析方法**
     - 🧬 基于化学相似性的活性验证
     - 📊 多维度分子表示对比
     - 🛡️ 安全的错误处理机制
