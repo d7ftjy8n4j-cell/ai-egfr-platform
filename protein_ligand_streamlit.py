@@ -14,19 +14,31 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # 尝试导入所需的库
+PLIP_AVAILABLE = False
+PY3DMOL_AVAILABLE = False
+
+try:
+    # 3D可视化
+    import py3Dmol
+    PY3DMOL_AVAILABLE = True
+except ImportError as e:
+    pass
+
 try:
     # PLIP用于蛋白质-配体相互作用分析
     from plip.structure.preparation import PDBComplex
     from plip.exchange.report import BindingSiteReport
-
-    # 3D可视化
-    import py3Dmol
-
     PLIP_AVAILABLE = True
     st.sidebar.success("✅ PLIP分析模块就绪")
 except ImportError as e:
     PLIP_AVAILABLE = False
     st.sidebar.warning(f"⚠️ PLIP分析模块不可用: {e}")
+
+# 检查3D可视化状态
+if PY3DMOL_AVAILABLE:
+    st.sidebar.success("✅ 3D可视化就绪")
+else:
+    st.sidebar.warning("⚠️ 3D可视化模块不可用")
 
 class StreamlitProteinLigandAnalyzer:
     """
@@ -103,7 +115,28 @@ class StreamlitProteinLigandAnalyzer:
         dict : 包含所有结合位点相互作用的字典
         """
         if not PLIP_AVAILABLE:
-            st.error("PLIP库未安装，无法分析相互作用")
+            st.error("❌ PLIP库未安装，无法分析相互作用")
+            st.info("""
+            **PLIP 安装说明**:
+
+            PLIP 需要一些系统依赖，安装方法如下：
+
+            **方法1: 使用 conda（推荐）**
+            ```bash
+            conda install -c conda-forge plip
+            ```
+
+            **方法2: 使用 pip**
+            ```bash
+            pip install plip
+            ```
+
+            **注意事项**:
+            - PLIP 依赖 OpenBabel，可能需要先安装系统依赖
+            - 在某些云端环境中可能无法安装完整的 PLIP
+
+            **替代方案**: 即使 PLIP 不可用，您仍然可以使用 3D 可视化功能查看蛋白质结构。
+            """)
             return {}
         
         try:
@@ -218,6 +251,23 @@ class StreamlitProteinLigandAnalyzer:
         -------
         stmol组件
         """
+        if not PY3DMOL_AVAILABLE:
+            st.error("❌ 3D可视化模块（py3Dmol）未安装")
+            st.info("""
+            **py3Dmol 安装说明**:
+
+            ```bash
+            pip install py3Dmol
+            ```
+
+            如果安装失败，请尝试：
+            ```bash
+            pip install --upgrade pip
+            pip install py3Dmol
+            ```
+            """)
+            return None
+
         if pdb_id and not self.pdb_file_path:
             # 在线加载PDB
             pdb_data = f"https://files.rcsb.org/view/{pdb_id}.pdb"
@@ -350,13 +400,28 @@ def render_protein_ligand_tab():
     渲染蛋白质-配体相互作用分析的Streamlit标签页
     """
     st.header("🔬 蛋白质-配体相互作用分析")
-    
+
+    # 显示模块状态
+    if not PLIP_AVAILABLE and not PY3DMOL_AVAILABLE:
+        st.error("❌ 核心模块未安装")
+        st.warning("""
+        **当前状态**:
+        - PLIP 分析模块: ❌ 不可用
+        - 3D 可视化模块: ❌ 不可用
+
+        **建议操作**:
+        1. 检查服务器环境是否支持 PLIP 安装
+        2. 尝试使用 conda 安装: `conda install -c conda-forge plip py3d`
+        3. 至少安装 py3Dmol 以使用 3D 可视化功能
+        """)
+        return
+
     # 创建分析器实例
     if 'pl_analyzer' not in st.session_state:
         st.session_state.pl_analyzer = StreamlitProteinLigandAnalyzer()
-    
+
     analyzer = st.session_state.pl_analyzer
-    
+
     # 侧边栏配置
     with st.sidebar:
         st.subheader("⚙️ 分析设置")
@@ -411,15 +476,22 @@ def render_protein_ligand_tab():
         
         # 可视化选项
         st.subheader("👁️ 可视化选项")
-        
-        show_structure = st.checkbox("显示3D结构", value=True)
-        show_interactions = st.checkbox("显示相互作用表", value=True)
-        show_summary = st.checkbox("显示统计摘要", value=True)
+
+        # 只有 PLIP 可用时才显示这些选项
+        if PLIP_AVAILABLE:
+            show_structure = st.checkbox("显示3D结构", value=True)
+            show_interactions = st.checkbox("显示相互作用表", value=True)
+            show_summary = st.checkbox("显示统计摘要", value=True)
+        else:
+            show_structure = st.checkbox("显示3D结构", value=True, disabled=False)
+            show_interactions = False
+            show_summary = False
+            st.info("⚠️ PLIP 不可用，仅支持 3D 结构可视化")
     
     # 主内容区
     if analyzer.pdb_file_path:
         # 如果有相互作用数据，显示分析结果
-        if analyzer.interactions_by_site:
+        if analyzer.interactions_by_site and PLIP_AVAILABLE:
             # 1. 3D结构可视化
             if show_structure:
                 st.subheader("🎨 3D结构可视化")
@@ -524,23 +596,51 @@ def render_protein_ligand_tab():
                                 st.write(f"- {int_type}: {count} 个相互作用")
                             st.write(f"**总计**: {site_info['total']} 个相互作用")
                             st.divider()
-        
+
         else:
-            # 提示开始分析
-            st.info("👆 点击侧边栏的『开始相互作用分析』按钮，分析蛋白质-配体相互作用")
+            # PLIP 不可用，但可以显示 3D 结构
+            if show_structure and PY3DMOL_AVAILABLE:
+                st.subheader("🎨 3D结构可视化（仅查看模式）")
+                st.info("""
+                **颜色说明**:
+                - 蛋白质: 彩色卡通表示 (二级结构)
+                - 配体: 橙色球棍模型
+                """)
+                st.warning("⚠️ PLIP 不可用，仅支持查看 3D 结构，无法分析相互作用")
+
+                # 显示 3D 结构
+                analyzer.visualize_structure_3d(highlight_residues=None)
+            elif not PY3DMOL_AVAILABLE:
+                st.error("❌ 3D 可视化不可用，请安装 py3Dmol")
+            else:
+                # 提示开始分析
+                st.info("👆 点击侧边栏的『开始相互作用分析』按钮，分析蛋白质-配体相互作用")
     
     else:
         # 初始状态
-        st.info("""
+        module_status = []
+        if PLIP_AVAILABLE:
+            module_status.append("✅ PLIP 分析")
+        else:
+            module_status.append("⚠️ PLIP 分析 (不可用)")
+
+        if PY3DMOL_AVAILABLE:
+            module_status.append("✅ 3D 可视化")
+        else:
+            module_status.append("⚠️ 3D 可视化 (不可用)")
+
+        st.info(f"""
         ## 🧬 蛋白质-配体相互作用分析
-        
+
+        **当前功能状态**: {' | '.join(module_status)}
+
         **功能说明**:
         1. **输入PDB结构**: 通过PDB ID或上传PDB文件提供蛋白质-配体复合物结构
-        2. **PLIP分析**: 自动识别结合位点，分析8种相互作用类型
-        3. **3D可视化**: 交互式查看蛋白质-配体复合物结构
+        2. **PLIP分析**: 自动识别结合位点，分析8种相互作用类型（需 PLIP）
+        3. **3D可视化**: 交互式查看蛋白质-配体复合物结构（需 py3Dmol）
         4. **数据导出**: 导出详细的相互作用数据
-        
-        **支持的相互作用类型**:
+
+        **支持的相互作用类型** (需要 PLIP):
         - 疏水相互作用 (hydrophobic)
         - 氢键 (hbond)
         - 水桥 (waterbridge)
