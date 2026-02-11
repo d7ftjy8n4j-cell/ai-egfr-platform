@@ -894,6 +894,45 @@ with tab7:
             if show_surface:
                 surface_opacity = st.slider("表面透明度", 0.0, 1.0, 0.5, 0.1)
 
+            # ========== 新增：刷新控制功能 ==========
+            st.markdown("---")
+            st.subheader("3. 刷新控制")
+            
+            # 定义一个 session state 来存储"实际渲染"的参数
+            if 'render_params' not in st.session_state:
+                st.session_state.render_params = {
+                    'style': 'cartoon', 'color': 'spectrum', 
+                    'ligand': True, 'surface': False, 'opacity': 0.5
+                }
+
+            # 暂停开关
+            pause_refresh = st.toggle("⏸️ 暂停实时刷新", value=False, help="开启后，修改上方样式不会立即触发重绘，需点击'手动刷新'按钮。")
+            
+            do_update = False
+            
+            if pause_refresh:
+                # 暂停模式：只有点击按钮才更新
+                if st.button("🔄 手动刷新视图", type="primary", use_container_width=True):
+                    do_update = True
+                else:
+                    st.caption("⚠️ 视图已锁定，修改样式后请点击上方按钮更新。")
+            else:
+                # 实时模式：只要参数变了就更新
+                do_update = True
+
+            # 决定最终传给渲染器的参数
+            if do_update:
+                st.session_state.render_params = {
+                    'style': style_select,
+                    'color': color_select,
+                    'ligand': show_ligand,
+                    'surface': show_surface,
+                    'opacity': surface_opacity
+                }
+            
+            # 获取当前用于渲染的参数（可能是旧的，也可能是新的）
+            current_render = st.session_state.render_params
+
         # --- 右侧显示区 ---
         with col_view:
             if st.session_state.viz_data_loaded:
@@ -908,13 +947,14 @@ with tab7:
                 try:
                     # ================== 修复代码 ==================
                     # 调用缓存函数，而不是直接调用 viz_tool.render_view
+                    # 使用 current_render 中的参数，而不是 widget 变量
                     view = get_3d_view(
                         pdb_data=current_pdb_data,
-                        style=style_select,
-                        color_scheme=color_select,
-                        show_ligand=show_ligand,
-                        show_surface=show_surface,
-                        surface_opacity=surface_opacity
+                        style=current_render['style'],
+                        color_scheme=current_render['color'],
+                        show_ligand=current_render['ligand'],
+                        show_surface=current_render['surface'],
+                        surface_opacity=current_render['opacity']
                     )
                     # ============================================
                     
