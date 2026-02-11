@@ -1,6 +1,6 @@
 """
-protein_ligand_streamlit.py - 蛋白质-配体相互作用分析模块
-基于TeachOpenCADD的T016+T017教程，适配Streamlit界面
+pharmacophore_streamlit.py - Streamlit集成的药效团生成模块
+基于TeachOpenCADD T009，简化并适配Streamlit Web界面
 """
 
 import streamlit as st
@@ -9,660 +9,649 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import tempfile
-import requests
+import base64
+from io import BytesIO
+import json
+import matplotlib.pyplot as plt
+from rdkit import Chem
+from rdkit.Chem import AllChem, Draw, rdMolDescriptors
+# rdShapeHelpers 在某些RDKit版本中可能不可用，尝试导入但不强制要求
+try:
+    from rdkit.Chem import rdShapeHelpers
+except ImportError:
+    rdShapeHelpers = None
+import py3Dmol
+# stmol 在Streamlit中可能有问题，使其可选导入
+try:
+    from stmol import showmol
+    STMOL_AVAILABLE = True
+except ImportError:
+    STMOL_AVAILABLE = False
+    showmol = None
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
-# 尝试导入所需的库
-PLIP_AVAILABLE = False
-PY3DMOL_AVAILABLE = False
-
-try:
-    # 3D可视化
-    import py3Dmol
-    PY3DMOL_AVAILABLE = True
-except ImportError as e:
-    pass
-
-try:
-    # PLIP用于蛋白质-配体相互作用分析
-    from plip.structure.preparation import PDBComplex
-    from plip.exchange.report import BindingSiteReport
-    PLIP_AVAILABLE = True
-    st.sidebar.success("✅ PLIP分析模块就绪")
-except ImportError as e:
-    PLIP_AVAILABLE = False
-    st.sidebar.warning(f"⚠️ PLIP分析模块不可用: {e}")
-
-# 检查3D可视化状态
-if PY3DMOL_AVAILABLE:
-    st.sidebar.success("✅ 3D可视化就绪")
-else:
-    st.sidebar.warning("⚠️ 3D可视化模块不可用")
-
-class StreamlitProteinLigandAnalyzer:
-    """
-    适配Streamlit的蛋白质-配体相互作用分析器
-    """
+class StreamlitPharmacophore:
+    """Streamlit友好的药效团生成器"""
     
     def __init__(self):
-        """初始化分析器"""
-        # 存储临时文件
-        self.temp_dir = Path(tempfile.gettempdir()) / "protein_ligand_analysis"
-        self.temp_dir.mkdir(exist_ok=True)
-        
-        # 存储相互作用数据
-        self.interactions_by_site = None
-        self.selected_site = None
-        self.pdb_file_path = None
-        
-        # 相互作用类型颜色映射
-        self.color_map = {
-            "hydrophobic": "#FFD700",  # 金色
-            "hbond": "#4169E1",        # 蓝色
-            "waterbridge": "#32CD32",  # 绿色
-            "saltbridge": "#FF4500",   # 橙色
-            "pistacking": "#8A2BE2",   # 紫色
-            "pication": "#00CED1",     # 青色
-            "halogen": "#FF1493",      # 粉色
-            "metal": "#A9A9A9",        # 灰色
+        self.feature_colors = {
+            "donor": (0, 1, 0),      # 绿色
+            "acceptor": (1, 0, 0),   # 红色
+            "hydrophobe": (1, 1, 0), # 黄色
+            "positive": (0, 0, 1),   # 蓝色
+            "negative": (1, 0, 1),   # 紫色
+            "aromatic": (1, 0.5, 0)  # 橙色
         }
-    
-    def download_pdb(self, pdb_id):
-        """
-        从RCSB PDB下载PDB文件
         
-        Parameters
-        ----------
-        pdb_id : str
-            PDB ID（如'3poz', '1aaq'）
-            
-        Returns
-        -------
-        str : PDB文件路径
-        """
-        pdb_id = pdb_id.lower().strip()
-        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+        self.feature_radii = {
+            "donor": 1.5,
+            "acceptor": 1.5,
+            "hydrophobe": 2.0,
+            "positive": 1.5,
+            "negative": 1.5,
+            "aromatic": 1.8
+        }
         
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            
-            # 保存到临时文件
-            pdb_file = self.temp_dir / f"{pdb_id}.pdb"
-            with open(pdb_file, 'w') as f:
-                f.write(response.text)
-            
-            st.success(f"✅ 成功下载PDB: {pdb_id.upper()}")
-            return str(pdb_file)
-            
-        except Exception as e:
-            st.error(f"❌ 下载PDB失败: {pdb_id.upper()}")
-            st.error(f"错误详情: {str(e)}")
-            return None
-    
-    def analyze_interactions(self, pdb_file_path):
-        """
-        使用PLIP分析蛋白质-配体相互作用
+        self.molecules = []
+        self.molecule_names = []
+        self.features = []
         
-        Parameters
-        ----------
-        pdb_file_path : str
-            PDB文件路径
-            
-        Returns
-        -------
-        dict : 包含所有结合位点相互作用的字典
-        """
-        if not PLIP_AVAILABLE:
-            st.error("❌ PLIP库未安装，无法分析相互作用")
-            st.info("""
-            **PLIP 安装说明**:
-
-            PLIP 需要一些系统依赖，安装方法如下：
-
-            **方法1: 使用 conda（推荐）**
-            ```bash
-            conda install -c conda-forge plip
-            ```
-
-            **方法2: 使用 pip**
-            ```bash
-            pip install plip
-            ```
-
-            **注意事项**:
-            - PLIP 依赖 OpenBabel，可能需要先安装系统依赖
-            - 在某些云端环境中可能无法安装完整的 PLIP
-
-            **替代方案**: 即使 PLIP 不可用，您仍然可以使用 3D 可视化功能查看蛋白质结构。
-            """)
-            return {}
+    def load_molecules_from_smiles(self, smiles_list, names=None):
+        """从SMILES列表加载分子并生成3D构象"""
+        self.molecules = []
+        self.molecule_names = []
         
-        try:
-            # 创建PLIP复合物对象
-            protlig = PDBComplex()
-            protlig.load_pdb(pdb_file_path)
-            
-            # 寻找配体并分析相互作用
-            for ligand in protlig.ligands:
-                protlig.characterize_complex(ligand)
-            
-            sites = {}
-            # 遍历所有结合位点
-            for key, site in sorted(protlig.interaction_sets.items()):
-                binding_site = BindingSiteReport(site)
+        for i, smiles in enumerate(smiles_list):
+            try:
+                mol = Chem.MolFromSmiles(smiles)
+                if mol is None:
+                    st.warning(f"无法解析SMILES: {smiles}")
+                    continue
+                    
+                # 添加氢原子
+                mol = Chem.AddHs(mol)
                 
-                # 要提取的相互作用类型
-                keys = (
-                    "hydrophobic", "hbond", "waterbridge", "saltbridge",
-                    "pistacking", "pication", "halogen", "metal"
-                )
+                # 生成3D构象
+                AllChem.EmbedMolecule(mol, randomSeed=42+i)
+                AllChem.MMFFOptimizeMolecule(mol)
                 
-                # 提取相互作用信息
-                interactions = {
-                    k: [getattr(binding_site, k + "_features")] + 
-                        getattr(binding_site, k + "_info")
-                    for k in keys
-                }
-                sites[key] = interactions
-            
-            self.interactions_by_site = sites
-            self.pdb_file_path = pdb_file_path
-            
-            st.success(f"✅ 分析完成！发现 {len(sites)} 个结合位点")
-            return sites
-            
-        except Exception as e:
-            st.error(f"❌ PLIP分析失败: {str(e)}")
-            return {}
+                self.molecules.append(mol)
+                
+                if names and i < len(names):
+                    self.molecule_names.append(names[i])
+                else:
+                    self.molecule_names.append(f"分子_{i+1}")
+                    
+            except Exception as e:
+                st.error(f"分子 {i+1} 处理失败: {str(e)[:100]}")
+                
+        return len(self.molecules)
     
-    def create_interaction_dataframe(self, site_index=0, interaction_type="all"):
-        """
-        为特定相互作用类型创建DataFrame
-        
-        Parameters
-        ----------
-        site_index : int
-            结合位点索引
-        interaction_type : str
-            相互作用类型，'all'表示所有类型
+    def extract_pharmacophore_features(self):
+        """提取药效团特征（简化版）"""
+        if not self.molecules:
+            return []
             
-        Returns
-        -------
-        pd.DataFrame : 包含相互作用细节的DataFrame
-        """
-        if not self.interactions_by_site:
-            return pd.DataFrame()
+        self.features = []
         
-        # 获取选定的结合位点
-        sites = list(self.interactions_by_site.keys())
-        if site_index >= len(sites):
-            st.warning(f"位点索引 {site_index} 超出范围，可用位点: {len(sites)}")
-            return pd.DataFrame()
-        
-        site_key = sites[site_index]
-        site_interactions = self.interactions_by_site[site_key]
-        
-        if interaction_type == "all":
-            # 合并所有相互作用类型
-            all_dfs = []
-            for int_type, int_list in site_interactions.items():
-                if len(int_list) > 1:  # 有数据
-                    df = pd.DataFrame.from_records(
-                        int_list[1:],
-                        columns=int_list[0]
-                    )
-                    df['interaction_type'] = int_type
-                    all_dfs.append(df)
+        for mol in self.molecules:
+            mol_features = self._extract_molecule_features(mol)
+            self.features.append(mol_features)
             
-            if all_dfs:
-                return pd.concat(all_dfs, ignore_index=True)
-            else:
-                return pd.DataFrame()
-        else:
-            # 特定相互作用类型
-            if interaction_type not in site_interactions:
-                return pd.DataFrame()
-            
-            int_list = site_interactions[interaction_type]
-            if len(int_list) <= 1:
-                return pd.DataFrame()
-            
-            df = pd.DataFrame.from_records(
-                int_list[1:],
-                columns=int_list[0]
-            )
-            df['interaction_type'] = interaction_type
-            return df
+        return self.features
     
-    def visualize_structure_3d(self, pdb_id=None, highlight_residues=None):
-        """
-        使用py3Dmol在Streamlit中可视化3D结构
+    def _extract_molecule_features(self, mol):
+        """提取单个分子的药效团特征"""
+        features = []
         
-        Parameters
-        ----------
-        pdb_id : str
-            PDB ID（用于在线加载）
-        highlight_residues : list
-            要高亮的残基编号列表
-        """
-        if not PY3DMOL_AVAILABLE:
-            st.error("❌ py3Dmol未安装，无法显示3D结构")
-            st.info("请运行: pip install py3Dmol==2.0.0.post2")
-            return
-
-        if pdb_id and not self.pdb_file_path:
-            # 在线加载PDB
-            pdb_data = f"https://files.rcsb.org/view/{pdb_id}.pdb"
-        elif self.pdb_file_path:
-            # 从文件加载
-            with open(self.pdb_file_path, 'r') as f:
-                pdb_data = f.read()
-        else:
-            st.error("没有可用的PDB数据")
-            return None
-        
-        try:
-            # 创建3D视图
-            view = py3Dmol.view(width=700, height=500)
-            
-            if isinstance(pdb_data, str) and pdb_data.startswith('http'):
-                # 在线PDB
-                view.addModel(requests.get(pdb_data).text, 'pdb')
-            else:
-                # 本地PDB数据
-                view.addModel(pdb_data, 'pdb')
-            
-            # 设置可视化样式
-            view.setStyle({'model': -1}, {
-                'cartoon': {'color': 'spectrum'},
-                'stick': {'radius': 0.15}
-            })
-            
-            # 高亮配体
-            view.addStyle({'resn': []}, {
-                'stick': {'colorscheme': 'orangeCarbon', 'radius': 0.3}
-            })
-            
-            # 如果有高亮残基
-            if highlight_residues:
-                for res in highlight_residues:
-                    view.addStyle({'resi': res}, {
-                        'stick': {'colorscheme': 'redCarbon', 'radius': 0.3},
-                        'cartoon': {'color': 'red'}
+        # 1. 氢键供体
+        for atom in mol.GetAtoms():
+            if atom.GetAtomicNum() == 7 or atom.GetAtomicNum() == 8:  # N或O
+                if atom.GetTotalNumHs() > 0:
+                    pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+                    features.append({
+                        "type": "donor",
+                        "atom_idx": atom.GetIdx(),
+                        "position": [pos.x, pos.y, pos.z],
+                        "strength": 1.0
                     })
-            
-            # 设置背景和视角
-            view.setBackgroundColor('white')
-            view.zoomTo()
-
-            # 将 view 对象转换为 HTML，并用 Streamlit 组件渲染
-            html_code = view._repr_html_()
-            components.html(html_code, height=500, width=700)
-
-        except Exception as e:
-            st.error(f"3D可视化失败: {str(e)}")
+        
+        # 2. 氢键受体
+        for atom in mol.GetAtoms():
+            if atom.GetAtomicNum() == 7 or atom.GetAtomicNum() == 8:  # N或O
+                pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+                features.append({
+                    "type": "acceptor",
+                    "atom_idx": atom.GetIdx(),
+                    "position": [pos.x, pos.y, pos.z],
+                    "strength": 1.0
+                })
+        
+        # 3. 疏水区域（基于碳原子）
+        for atom in mol.GetAtoms():
+            if atom.GetAtomicNum() == 6 and atom.GetIsAromatic():
+                pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+                features.append({
+                    "type": "aromatic",
+                    "atom_idx": atom.GetIdx(),
+                    "position": [pos.x, pos.y, pos.z],
+                    "strength": 1.0
+                })
+            elif atom.GetAtomicNum() == 6 and atom.GetTotalNumHs() >= 2:
+                pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+                features.append({
+                    "type": "hydrophobe",
+                    "atom_idx": atom.GetIdx(),
+                    "position": [pos.x, pos.y, pos.z],
+                    "strength": 0.7
+                })
+                
+        return features
+    
+    def generate_ensemble_pharmacophore(self, threshold=0.7):
+        """生成集成药效团模型"""
+        if not self.features or len(self.features) < 2:
             return None
-    
-    def generate_interaction_summary(self):
-        """
-        生成相互作用总结报告
-        
-        Returns
-        -------
-        dict : 总结统计信息
-        """
-        if not self.interactions_by_site:
-            return {}
-        
-        summary = {
-            "total_sites": len(self.interactions_by_site),
-            "site_details": {},
-            "total_interactions": 0
-        }
-        
-        for site_key, site_data in self.interactions_by_site.items():
-            site_summary = {}
-            total_site_interactions = 0
             
-            for int_type, int_list in site_data.items():
-                count = len(int_list) - 1  # 减去标题行
-                if count > 0:
-                    site_summary[int_type] = count
-                    total_site_interactions += count
+        # 收集所有特征
+        all_features = []
+        for mol_idx, mol_features in enumerate(self.features):
+            for feature in mol_features:
+                feature["mol_idx"] = mol_idx
+                all_features.append(feature)
+        
+        # 按特征类型分组
+        feature_by_type = {}
+        for feature in all_features:
+            ftype = feature["type"]
+            if ftype not in feature_by_type:
+                feature_by_type[ftype] = []
+            feature_by_type[ftype].append(feature)
+        
+        # 对每个特征类型进行聚类（简化版：基于距离）
+        ensemble_features = {}
+        
+        for ftype, features in feature_by_type.items():
+            if len(features) < 2:
+                continue
+                
+            # 计算特征点之间的平均位置
+            positions = np.array([f["position"] for f in features])
+            avg_position = np.mean(positions, axis=0)
             
-            summary["site_details"][site_key] = {
-                "interactions": site_summary,
-                "total": total_site_interactions
-            }
-            summary["total_interactions"] += total_site_interactions
-        
-        return summary
+            # 计算重要性（出现的分子比例）
+            importance = len(set([f["mol_idx"] for f in features])) / len(self.molecules)
+            
+            if importance >= threshold:
+                ensemble_features[ftype] = {
+                    "position": avg_position.tolist(),
+                    "importance": importance,
+                    "count": len(features),
+                    "radius": self.feature_radii.get(ftype, 1.5)
+                }
+                
+        return ensemble_features
     
-    def plot_interaction_chart(self, summary_data):
-        """
-        绘制相互作用类型的统计图表
+    def visualize_ensemble_pharmacophore_3d(self, ensemble_features, width=800, height=600):
+        """3D可视化集成药效团"""
+        viewer = py3Dmol.view(width=width, height=height)
         
-        Parameters
-        ----------
-        summary_data : dict
-            总结数据
-        """
-        if not summary_data or "site_details" not in summary_data:
-            return
+        # 添加分子
+        for i, mol in enumerate(self.molecules):
+            # 将分子转换为PDB字符串
+            pdb_block = Chem.MolToPDBBlock(mol)
+            viewer.addModel(pdb_block, 'pdb')
+            
+            # 设置分子样式
+            viewer.setStyle({'model': i}, 
+                          {'stick': {'colorscheme': 'grayCarbon', 'radius': 0.2}})
         
-        import matplotlib.pyplot as plt
+        # 添加药效团特征
+        for ftype, feature in ensemble_features.items():
+            pos = feature["position"]
+            color = self.feature_colors.get(ftype, (1, 1, 1))
+            radius = feature.get("radius", 1.5)
+            importance = feature.get("importance", 1.0)
+            
+            # 设置透明度基于重要性
+            opacity = 0.3 + 0.7 * importance
+            
+            # 添加球体
+            viewer.addSphere({
+                'center': {'x': pos[0], 'y': pos[1], 'z': pos[2]},
+                'radius': radius,
+                'color': f'rgb({int(color[0]*255)},{int(color[1]*255)},{int(color[2]*255)})',
+                'opacity': opacity
+            })
+            
+            # 添加标签
+            viewer.addLabel(
+                f"{ftype}\n{importance:.1%}",
+                {'position': {'x': pos[0], 'y': pos[1]+radius, 'z': pos[2]},
+                 'backgroundColor': f'rgba({int(color[0]*255)},{int(color[1]*255)},{int(color[2]*255)},0.7)',
+                 'fontColor': 'black',
+                 'fontSize': 12}
+            )
         
-        # 获取第一个位点的数据
-        first_site_key = list(summary_data["site_details"].keys())[0]
-        site_interactions = summary_data["site_details"][first_site_key]["interactions"]
+        viewer.zoomTo()
+        return viewer
+    
+    def visualize_2d_pharmacophore(self, ensemble_features, width=600, height=400):
+        """2D可视化药效团（Matplotlib）"""
+        fig, ax = plt.subplots(figsize=(width/100, height/100))
         
-        if not site_interactions:
-            return
+        # 创建极坐标图显示特征分布
+        feature_types = list(ensemble_features.keys())
+        importances = [ensemble_features[ft]["importance"] for ft in feature_types]
+        counts = [ensemble_features[ft]["count"] for ft in feature_types]
+        
+        # 创建颜色
+        colors = [self.feature_colors.get(ft, (0.5, 0.5, 0.5)) for ft in feature_types]
         
         # 创建条形图
-        fig, ax = plt.subplots(figsize=(10, 6))
-        types = list(site_interactions.keys())
-        counts = list(site_interactions.values())
-        colors = [self.color_map.get(t, "#808080") for t in types]
+        y_pos = np.arange(len(feature_types))
         
-        bars = ax.barh(types, counts, color=colors)
-        ax.set_xlabel("相互作用数量", fontsize=12)
-        ax.set_title(f"结合位点 {first_site_key} 的相互作用类型分布", fontsize=14, pad=20)
+        # 重要性条形
+        bars1 = ax.barh(y_pos - 0.2, importances, 0.4, 
+                       color=colors, alpha=0.6, label='重要性')
         
-        # 在条形上添加数值标签
-        for bar, count in zip(bars, counts):
-            ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height()/2,
-                   f"{count}", va='center', fontsize=10)
+        # 数量条形
+        bars2 = ax.barh(y_pos + 0.2, [c/max(counts) for c in counts], 0.4,
+                       color=colors, alpha=0.3, label='数量(归一化)')
+        
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(feature_types)
+        ax.set_xlabel('值')
+        ax.set_title('药效团特征统计')
+        ax.legend()
+        
+        # 添加数值标签
+        for i, (imp, cnt) in enumerate(zip(importances, counts)):
+            ax.text(imp, i-0.2, f'{imp:.0%}', va='center', ha='left')
+            ax.text(cnt/max(counts), i+0.2, f'{cnt}', va='center', ha='left')
         
         plt.tight_layout()
-        st.pyplot(fig)
+        return fig
+    
+    def generate_pharmacophore_report(self, ensemble_features):
+        """生成药效团分析报告"""
+        report = {
+            "summary": {
+                "total_molecules": len(self.molecules),
+                "total_features": len(ensemble_features),
+                "average_importance": np.mean([f["importance"] for f in ensemble_features.values()])
+            },
+            "features": ensemble_features,
+            "molecules": [
+                {
+                    "name": name,
+                    "smiles": Chem.MolToSmiles(mol),
+                    "num_atoms": mol.GetNumAtoms(),
+                    "mw": rdMolDescriptors.CalcExactMolWt(mol)
+                }
+                for name, mol in zip(self.molecule_names, self.molecules)
+            ]
+        }
+        return report
+    
+    def save_pharmacophore_model(self, ensemble_features, filepath):
+        """保存药效团模型为JSON文件"""
+        with open(filepath, 'w') as f:
+            json.dump({
+                "features": ensemble_features,
+                "molecules": [
+                    {
+                        "name": name,
+                        "smiles": Chem.MolToSmiles(mol)
+                    }
+                    for name, mol in zip(self.molecule_names, self.molecules)
+                ],
+                "metadata": {
+                    "generator": "StreamlitPharmacophore",
+                    "version": "1.0",
+                    "timestamp": pd.Timestamp.now().isoformat()
+                }
+            }, f, indent=2)
+        
+        return filepath
 
-def render_protein_ligand_tab():
-    """
-    渲染蛋白质-配体相互作用分析的Streamlit标签页
-    """
-    st.header("🔬 蛋白质-配体相互作用分析")
-
-    # 显示模块状态
-    if not PLIP_AVAILABLE and not PY3DMOL_AVAILABLE:
-        st.error("❌ 核心模块未安装")
-        st.warning("""
-        **当前状态**:
-        - PLIP 分析模块: ❌ 不可用
-        - 3D 可视化模块: ❌ 不可用
-
-        **建议操作**:
-        1. 检查服务器环境是否支持 PLIP 安装
-        2. 尝试使用 conda 安装: `conda install -c conda-forge plip py3d`
-        3. 至少安装 py3Dmol 以使用 3D 可视化功能
-        """)
-        return
-
-    # 创建分析器实例
-    if 'pl_analyzer' not in st.session_state:
-        st.session_state.pl_analyzer = StreamlitProteinLigandAnalyzer()
-
-    analyzer = st.session_state.pl_analyzer
-
-    # 侧边栏配置
-    with st.sidebar:
-        st.subheader("⚙️ 分析设置")
+def render_pharmacophore_tab():
+    """渲染药效团生成标签页"""
+    
+    
+    st.markdown("""
+    从已知活性分子生成集成药效团模型，用于指导分子设计和优化。
+    **功能**: 分子加载 → 特征提取 → 聚类 → 药效团生成 → 3D可视化
+    """)
+    
+    # 初始化药效团生成器
+    if 'pharmacophore_generator' not in st.session_state:
+        st.session_state.pharmacophore_generator = StreamlitPharmacophore()
+    
+    generator = st.session_state.pharmacophore_generator
+    
+    # 创建标签页
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📥 数据输入",
+        "🔍 特征分析",
+        "🎯 药效团生成",
+        "💾 导出结果"
+    ])
+    
+    with tab1:
+        st.subheader("输入活性分子")
         
         input_method = st.radio(
             "选择输入方式:",
-            ["使用PDB ID", "上传PDB文件"]
+            ["📝 手动输入SMILES", "📁 上传文件", "🔗 使用示例数据"]
         )
         
-        if input_method == "使用PDB ID":
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                pdb_id = st.text_input(
-                    "PDB ID:",
-                    value="3poz",
-                    help="输入PDB ID，如：3poz (EGFR激酶), 1aaq (HIV蛋白酶)"
-                )
-            with col2:
-                st.markdown("")  # 占位符
-                st.markdown("")  # 占位符
-                if st.button("🔍 获取", use_container_width=True):
-                    with st.spinner("正在下载PDB文件..."):
-                        analyzer.pdb_file_path = analyzer.download_pdb(pdb_id)
-                        
-        else:  # 上传文件
-            uploaded_file = st.file_uploader(
-                "上传PDB文件:",
-                type=['pdb'],
-                help="上传本地PDB文件进行分析"
+        if input_method == "📝 手动输入SMILES":
+            smiles_input = st.text_area(
+                "输入SMILES（每行一个分子）:",
+                height=200,
+                value="""Brc1cccc(Nc2ncnc3cc4ccccc4cc23)c1
+COC1=C(C=C2C(=C1)N=CN=C2C3=CC(=C(C=C3)F)Cl)OCCCN4CCOCC4
+CN1C=NC2=C1C(=O)N(C(=O)N2C)C
+CC(=O)OC1=CC=CC=C1C(=O)O"""
             )
+            
+            names_input = st.text_area(
+                "输入分子名称（可选，每行一个）:",
+                height=100,
+                value="""EGFR抑制剂1
+吉非替尼类似物
+咖啡因
+阿司匹林"""
+            )
+            
+            if st.button("🚀 加载分子", type="primary"):
+                smiles_list = [s.strip() for s in smiles_input.split('\n') if s.strip()]
+                names_list = [n.strip() for n in names_input.split('\n') if n.strip()]
+                
+                with st.spinner(f"正在加载 {len(smiles_list)} 个分子..."):
+                    loaded_count = generator.load_molecules_from_smiles(smiles_list, names_list)
+                    st.success(f"✅ 成功加载 {loaded_count} 个分子")
+                    
+                    # 显示加载的分子
+                    if loaded_count > 0:
+                        st.subheader("加载的分子预览")
+                        cols = st.columns(min(4, loaded_count))
+                        for idx, (col, mol) in enumerate(zip(cols, generator.molecules)):
+                            with col:
+                                img = Draw.MolToImage(mol, size=(200, 200))
+                                col.image(img, caption=generator.molecule_names[idx])
+        
+        elif input_method == "📁 上传文件":
+            uploaded_file = st.file_uploader(
+                "上传分子文件 (支持 .smi, .txt, .csv)",
+                type=['smi', 'txt', 'csv'],
+                help="文件应包含SMILES列，可选名称列"
+            )
+            
             if uploaded_file:
-                # 保存上传的文件
-                temp_file = analyzer.temp_dir / uploaded_file.name
-                with open(temp_file, 'wb') as f:
-                    f.write(uploaded_file.getbuffer())
-                analyzer.pdb_file_path = str(temp_file)
-                st.success(f"✅ 已上传: {uploaded_file.name}")
+                try:
+                    if uploaded_file.name.endswith('.csv'):
+                        df = pd.read_csv(uploaded_file)
+                        smiles_col = st.selectbox("选择SMILES列:", df.columns)
+                        
+                        if 'name' in df.columns:
+                            name_col = st.selectbox("选择名称列:", df.columns, index=list(df.columns).index('name'))
+                        else:
+                            name_col = None
+                        
+                        smiles_list = df[smiles_col].tolist()
+                        names_list = df[name_col].tolist() if name_col else None
+                    else:
+                        content = uploaded_file.getvalue().decode()
+                        lines = content.strip().split('\n')
+                        smiles_list = []
+                        names_list = []
+                        
+                        for line in lines:
+                            parts = line.strip().split()
+                            if len(parts) >= 1:
+                                smiles_list.append(parts[0])
+                                if len(parts) >= 2:
+                                    names_list.append(parts[1])
+                        
+                    if st.button("加载上传的分子"):
+                        loaded_count = generator.load_molecules_from_smiles(smiles_list, names_list)
+                        st.success(f"✅ 从文件加载 {loaded_count} 个分子")
+                        
+                except Exception as e:
+                    st.error(f"文件处理失败: {str(e)}")
         
-        st.divider()
-        
-        # 分析控制
-        st.subheader("🔬 分析控制")
-        
-        if st.button("🚀 开始相互作用分析", use_container_width=True, type="primary"):
-            if analyzer.pdb_file_path:
-                with st.spinner("正在分析蛋白质-配体相互作用..."):
-                    analyzer.analyze_interactions(analyzer.pdb_file_path)
-            else:
-                st.warning("请先提供PDB文件")
-        
-        st.divider()
-        
-        # 可视化选项
-        st.subheader("👁️ 可视化选项")
-
-        # 只有 PLIP 可用时才显示这些选项
-        if PLIP_AVAILABLE:
-            show_structure = st.checkbox("显示3D结构", value=True)
-            show_interactions = st.checkbox("显示相互作用表", value=True)
-            show_summary = st.checkbox("显示统计摘要", value=True)
-        else:
-            show_structure = st.checkbox("显示3D结构", value=True, disabled=False)
-            show_interactions = False
-            show_summary = False
-            st.info("⚠️ PLIP 不可用，仅支持 3D 结构可视化")
+        else:  # 使用示例数据
+            st.info("使用EGFR抑制剂示例数据集")
+            
+            example_smiles = [
+                "Brc1cccc(Nc2ncnc3cc4ccccc4cc23)c1",
+                "COC1=C(C=C2C(=C1)N=CN=C2C3=CC(=C(C=C3)F)Cl)OCCCN4CCOCC4",
+                "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+                "CC(=O)OC1=CC=CC=C1C(=O)O",
+                "C1=CC=C(C=C1)C=O"
+            ]
+            
+            example_names = [
+                "EGFR核心骨架",
+                "吉非替尼类似物",
+                "咖啡因（阴性对照）",
+                "阿司匹林（阴性对照）",
+                "苯甲醛"
+            ]
+            
+            if st.button("加载示例数据", type="secondary"):
+                with st.spinner("加载示例数据..."):
+                    loaded_count = generator.load_molecules_from_smiles(example_smiles, example_names)
+                    st.success(f"✅ 加载 {loaded_count} 个示例分子")
+                    
+                    # 显示示例分子
+                    st.subheader("示例分子预览")
+                    cols = st.columns(5)
+                    for idx, (col, mol) in enumerate(zip(cols, generator.molecules)):
+                        with col:
+                            img = Draw.MolToImage(mol, size=(150, 150))
+                            col.image(img, caption=example_names[idx])
     
-    # 主内容区
-    if analyzer.pdb_file_path:
-        # 如果有相互作用数据，显示分析结果
-        if analyzer.interactions_by_site and PLIP_AVAILABLE:
-            # 1. 3D结构可视化
-            if show_structure:
-                st.subheader("🎨 3D结构可视化")
-                st.info("""
-                **颜色说明**: 
-                - 蛋白质: 彩色卡通表示 (二级结构)
-                - 配体: 橙色球棍模型
-                - 相互作用残基: 红色高亮
-                """)
-                
-                # 从相互作用数据中提取要高亮的残基
-                if analyzer.interactions_by_site:
-                    first_site = list(analyzer.interactions_by_site.keys())[0]
-                    first_site_data = analyzer.interactions_by_site[first_site]
+    with tab2:
+        st.subheader("药效团特征分析")
+        
+        if not generator.molecules:
+            st.warning("请先在'数据输入'标签页加载分子")
+        else:
+            if st.button("🔍 提取特征", type="primary"):
+                with st.spinner("正在提取药效团特征..."):
+                    features = generator.extract_pharmacophore_features()
                     
-                    # 提取所有相互作用的残基编号
-                    highlight_residues = set()
-                    for int_type, int_list in first_site_data.items():
-                        if len(int_list) > 1:
-                            df = pd.DataFrame.from_records(
-                                int_list[1:],
-                                columns=int_list[0]
-                            )
-                            if 'RESNR' in df.columns:
-                                residues = df['RESNR'].unique()
-                                highlight_residues.update(residues)
+                    # 显示特征统计
+                    total_features = sum([len(f) for f in features])
+                    feature_types = {}
                     
-                    # 显示3D结构
-                    analyzer.visualize_structure_3d(highlight_residues=list(highlight_residues))
-            
-            # 2. 相互作用数据表
-            if show_interactions:
-                st.subheader("📊 相互作用数据")
-                
-                # 选择结合位点
-                site_options = list(analyzer.interactions_by_site.keys())
-                selected_site_idx = st.selectbox(
-                    "选择结合位点:",
-                    range(len(site_options)),
-                    format_func=lambda i: f"位点 {i+1}: {site_options[i]}"
-                )
-                
-                # 选择相互作用类型
-                int_types = ["all"] + list(analyzer.color_map.keys())
-                selected_int_type = st.selectbox(
-                    "选择相互作用类型:",
-                    int_types,
-                    format_func=lambda x: "所有类型" if x == "all" else x
-                )
-                
-                # 显示数据表
-                df = analyzer.create_interaction_dataframe(
-                    site_index=selected_site_idx,
-                    interaction_type=selected_int_type
-                )
-                
-                if not df.empty:
-                    st.dataframe(
-                        df,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=400
-                    )
+                    for mol_features in features:
+                        for feature in mol_features:
+                            ftype = feature["type"]
+                            feature_types[ftype] = feature_types.get(ftype, 0) + 1
                     
-                    # 导出选项
-                    csv_data = df.to_csv(index=False, encoding='utf-8-sig')
-                    st.download_button(
-                        label="📥 导出CSV",
-                        data=csv_data,
-                        file_name=f"protein_ligand_interactions.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("该位点/相互作用类型没有发现相互作用")
-            
-            # 3. 统计摘要
-            if show_summary:
-                st.subheader("📈 相互作用统计")
-                
-                summary = analyzer.generate_interaction_summary()
-                
-                if summary:
-                    # 显示关键指标
-                    col1, col2, col3 = st.columns(3)
+                    st.success(f"✅ 提取 {total_features} 个特征")
+                    
+                    # 特征类型分布
+                    col1, col2 = st.columns(2)
+                    
                     with col1:
-                        st.metric("结合位点", summary["total_sites"])
+                        st.subheader("特征类型分布")
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        
+                        types = list(feature_types.keys())
+                        counts = list(feature_types.values())
+                        colors = [generator.feature_colors.get(t, (0.5, 0.5, 0.5)) for t in types]
+                        
+                        ax.bar(types, counts, color=colors)
+                        ax.set_ylabel('数量')
+                        ax.set_title('特征类型分布')
+                        plt.xticks(rotation=45)
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                    
                     with col2:
-                        st.metric("总相互作用数", summary["total_interactions"])
-                    with col3:
-                        first_site = list(summary["site_details"].keys())[0]
-                        st.metric("主位点相互作用", 
-                                 summary["site_details"][first_site]["total"])
-                    
-                    # 绘制图表
-                    analyzer.plot_interaction_chart(summary)
-                    
-                    # 详细总结
-                    with st.expander("📋 详细总结报告"):
-                        for site_key, site_info in summary["site_details"].items():
-                            st.markdown(f"**结合位点: {site_key}**")
-                            for int_type, count in site_info["interactions"].items():
-                                st.write(f"- {int_type}: {count} 个相互作用")
-                            st.write(f"**总计**: {site_info['total']} 个相互作用")
-                            st.divider()
-
-        else:
-            # PLIP 不可用，但可以显示 3D 结构
-            if show_structure and PY3DMOL_AVAILABLE:
-                st.subheader("🎨 3D结构可视化（仅查看模式）")
-                st.info("""
-                **颜色说明**:
-                - 蛋白质: 彩色卡通表示 (二级结构)
-                - 配体: 橙色球棍模型
-                """)
-                st.warning("⚠️ PLIP 不可用，仅支持查看 3D 结构，无法分析相互作用")
-
-                # 显示 3D 结构
-                analyzer.visualize_structure_3d(highlight_residues=None)
-            elif not PY3DMOL_AVAILABLE:
-                st.error("❌ 3D 可视化不可用，请安装 py3Dmol")
-            else:
-                # 提示开始分析
-                st.info("👆 点击侧边栏的『开始相互作用分析』按钮，分析蛋白质-配体相互作用")
+                        st.subheader("特征详情")
+                        feature_data = []
+                        for i, mol_features in enumerate(features):
+                            for feature in mol_features:
+                                feature_data.append({
+                                    "分子": generator.molecule_names[i],
+                                    "类型": feature["type"],
+                                    "X": f"{feature['position'][0]:.2f}",
+                                    "Y": f"{feature['position'][1]:.2f}",
+                                    "Z": f"{feature['position'][2]:.2f}"
+                                })
+                        
+                        if feature_data:
+                            df_features = pd.DataFrame(feature_data)
+                            st.dataframe(df_features, use_container_width=True)
     
-    else:
-        # 初始状态
-        module_status = []
-        if PLIP_AVAILABLE:
-            module_status.append("✅ PLIP 分析")
+    with tab3:
+        st.subheader("生成集成药效团")
+        
+        if not generator.features:
+            st.warning("请先提取特征")
         else:
-            module_status.append("⚠️ PLIP 分析 (不可用)")
+            col_param1, col_param2 = st.columns(2)
+            
+            with col_param1:
+                threshold = st.slider("重要性阈值:", 0.1, 1.0, 0.7, 0.05)
+            
+            with col_param2:
+                cluster_method = st.selectbox("聚类方法:", ["距离平均", "K-means", "DBSCAN"])
+            
+            if st.button("🎯 生成药效团模型", type="primary"):
+                with st.spinner("正在生成集成药效团..."):
+                    ensemble_features = generator.generate_ensemble_pharmacophore(threshold)
+                    
+                    if ensemble_features:
+                        st.success(f"✅ 生成 {len(ensemble_features)} 个药效团特征")
 
-        if PY3DMOL_AVAILABLE:
-            module_status.append("✅ 3D 可视化")
+                        # 3D可视化
+                        st.subheader("3D药效团模型")
+                        viewer = generator.visualize_ensemble_pharmacophore_3d(
+                            ensemble_features,
+                            width=800,
+                            height=600
+                        )
+
+                        # 在Streamlit中显示
+                        if STMOL_AVAILABLE and showmol:
+                            showmol(viewer, height=600)
+                        else:
+                            st.warning("⚠️ stmol 不可用，使用基础HTML渲染")
+                            st.components.v1.html(viewer._make_html(), height=600, scrolling=True)
+                        
+                        # 2D统计图
+                        st.subheader("特征统计")
+                        fig_2d = generator.visualize_2d_pharmacophore(ensemble_features)
+                        st.pyplot(fig_2d)
+                        
+                        # 特征说明
+                        st.subheader("🧪 特征说明")
+                        
+                        feature_explanations = {
+                            "donor": "氢键供体：提供氢原子形成氢键（如 -NH, -OH）",
+                            "acceptor": "氢键受体：接受氢原子形成氢键（如 C=O, N:)",
+                            "hydrophobe": "疏水区域：疏水相互作用区域（如脂肪链）",
+                            "aromatic": "芳香环：π-π堆积作用",
+                            "positive": "正电荷：静电相互作用",
+                            "negative": "负电荷：静电相互作用"
+                        }
+                        
+                        for ftype, feature in ensemble_features.items():
+                            importance = feature["importance"]
+                            count = feature["count"]
+                            explanation = feature_explanations.get(ftype, "未知特征")
+                            
+                            st.info(f"""
+                            **{ftype.upper()}** 
+                            - 重要性: {importance:.0%}
+                            - 出现次数: {count}
+                            - 解释: {explanation}
+                            """)
+                        
+                        # 保存到session state
+                        st.session_state.ensemble_features = ensemble_features
+                        
+                    else:
+                        st.error("无法生成药效团，请降低阈值或添加更多分子")
+    
+    with tab4:
+        st.subheader("导出药效团结果")
+        
+        if 'ensemble_features' not in st.session_state:
+            st.warning("请先生成药效团模型")
         else:
-            module_status.append("⚠️ 3D 可视化 (不可用)")
+            ensemble_features = st.session_state.ensemble_features
+            
+            # 生成报告
+            report = generator.generate_pharmacophore_report(ensemble_features)
+            
+            col_export1, col_export2 = st.columns(2)
+            
+            with col_export1:
+                st.subheader("JSON导出")
+                json_str = json.dumps(report, indent=2, ensure_ascii=False)
+                
+                st.download_button(
+                    label="📥 下载JSON报告",
+                    data=json_str,
+                    file_name="pharmacophore_report.json",
+                    mime="application/json"
+                )
+                
+                # 显示报告预览
+                with st.expander("预览JSON报告"):
+                    st.code(json_str[:1000] + "..." if len(json_str) > 1000 else json_str)
+            
+            with col_export2:
+                st.subheader("图像导出")
+                
+                # 生成2D图像
+                fig = generator.visualize_2d_pharmacophore(ensemble_features)
+                
+                buf = BytesIO()
+                fig.savefig(buf, format="png", dpi=150, bbox_inches='tight')
+                buf.seek(0)
+                
+                st.download_button(
+                    label="📥 下载统计图",
+                    data=buf,
+                    file_name="pharmacophore_statistics.png",
+                    mime="image/png"
+                )
+            
+            # 应用建议
+            st.subheader("🎯 药物设计建议")
+            
+            if ensemble_features:
+                suggestions = []
+                
+                if "donor" in ensemble_features and "acceptor" in ensemble_features:
+                    suggestions.append("**设计氢键网络**: 同时包含供体和受体以增强结合亲和力")
+                
+                if "hydrophobe" in ensemble_features:
+                    suggestions.append("**优化疏水区域**: 增强疏水相互作用以提高选择性")
+                
+                if "aromatic" in ensemble_features:
+                    suggestions.append("**引入芳香环**: 增强π-π堆积作用")
+                
+                if suggestions:
+                    for suggestion in suggestions:
+                        st.success(suggestion)
+                else:
+                    st.info("基于当前药效团，建议综合考虑多种相互作用类型")
 
-        st.info(f"""
-        ## 🧬 蛋白质-配体相互作用分析
-
-        **当前功能状态**: {' | '.join(module_status)}
-
-        **功能说明**:
-        1. **输入PDB结构**: 通过PDB ID或上传PDB文件提供蛋白质-配体复合物结构
-        2. **PLIP分析**: 自动识别结合位点，分析8种相互作用类型（需 PLIP）
-        3. **3D可视化**: 交互式查看蛋白质-配体复合物结构（需 py3Dmol）
-        4. **数据导出**: 导出详细的相互作用数据
-
-        **支持的相互作用类型** (需要 PLIP):
-        - 疏水相互作用 (hydrophobic)
-        - 氢键 (hbond)
-        - 水桥 (waterbridge)
-        - 盐桥 (saltbridge)
-        - π-π堆积 (pistacking)
-        - π-阳离子 (pication)
-        - 卤键 (halogen)
-        - 金属配位 (metal)
-        
-        **示例PDB ID**:
-        - `3poz`: EGFR激酶与抑制剂复合物
-        - `1aaq`: HIV蛋白酶与抑制剂复合物
-        - `1pdb`: 胰蛋白酶与抑制剂复合物
-        """)
-        
-        # 快速示例
-        st.subheader("🚀 快速开始示例")
-        
-        example_cols = st.columns(4)
-        examples = [
-            ("3poz", "EGFR激酶"),
-            ("1aaq", "HIV蛋白酶"),
-            ("1pdb", "胰蛋白酶"),
-            ("1fkg", "FK506结合蛋白")
-        ]
-        
-        for idx, (pdb_id, desc) in enumerate(examples):
-            with example_cols[idx]:
-                if st.button(f"🔬 {pdb_id}", use_container_width=True, key=f"ex_{pdb_id}"):
-                    with st.spinner(f"正在获取{desc}结构..."):
-                        analyzer.pdb_file_path = analyzer.download_pdb(pdb_id)
-                    st.rerun()
-
-# 如果直接运行此模块，显示独立的界面
+# 独立运行
 if __name__ == "__main__":
     st.set_page_config(
-        page_title="蛋白质-配体相互作用分析",
-        page_icon="🔬",
+        page_icon="🎯",
         layout="wide"
     )
-    render_protein_ligand_tab()
+    render_pharmacophore_tab()
