@@ -29,9 +29,16 @@ plotly>=6.5.0
 # 网络请求与工具
 requests>=2.31.0
 
-# 修复streamlit依赖版本冲突（精确锁定版本，放在前面）
-rich==13.7.1
-markdown-it-py<3
+# 修复streamlit依赖版本冲突（严格按照streamlit 1.29.0的要求）
+# streamlit 1.29.0 requires: rich<14,>=10.14.0 and markdown-it-py<3.0.0,>=2.2.0
+rich>=10.14.0,<14
+markdown-it-py>=2.2.0,<3.0.0
+
+# ipywidgets版本修复（nglview 4.x 需要 ipywidgets>=8）
+ipywidgets>=8.0.0
+
+# 添加setuptools以解决pkg_resources问题
+setuptools>=68.0.0
 
 # 药效团3D可视化
 py3Dmol>=2.0.1
@@ -39,7 +46,6 @@ ipython_genutils>=0.2.0  # stmol的依赖
 
 # stmol在Streamlit环境中有问题，改用py3Dmol直接渲染
 # stmol>=0.0.8
-nglview>=3.0.3  # 备用
+nglview>=3.0.3,<4.0.0  # 限制版本避免ipywidgets冲突
 
 plip>=2.2.0
-requests>=2.28.0

@@ -167,12 +167,24 @@ try:
     st.sidebar.success("✅ 随机森林预测器就绪")
     logging.info("随机森林预测器导入成功")
 except Exception as e:
-    RF_PREDICTOR_AVAILABLE = False
-    st.sidebar.error(f"❌ 随机森林预测器初始化失败")
-    st.sidebar.warning(f"错误详情: {str(e)[:100]}...")
     logging.error(f"随机森林预测器失败: {e}")
-    import traceback
-    traceback.print_exc()
+    # 尝试使用备用预测器
+    try:
+        from fallback_predictor import FallbackEGFRPredictor
+        # 创建一个兼容RealEGFRPredictor接口的包装类
+        class RealEGFRPredictor(FallbackEGFRPredictor):
+            pass
+        test_predictor = RealEGFRPredictor()
+        RF_PREDICTOR_AVAILABLE = True
+        st.sidebar.warning("⚠️ 使用备用随机森林预测器")
+        logging.info("备用随机森林预测器加载成功")
+    except Exception as fallback_error:
+        RF_PREDICTOR_AVAILABLE = False
+        st.sidebar.error(f"❌ 随机森林预测器初始化失败")
+        st.sidebar.warning(f"错误详情: {str(e)[:100]}...")
+        logging.error(f"备用预测器也失败: {fallback_error}")
+        import traceback
+        traceback.print_exc()
 
 # 导入GNN预测器
 try:
