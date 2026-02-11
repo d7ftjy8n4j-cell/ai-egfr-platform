@@ -33,7 +33,10 @@ requests>=2.31.0
 rich==13.7.1
 markdown-it-py<3
 
-# 添加
+# 药效团3D可视化
 py3Dmol>=2.0.1
-stmol>=0.0.8
+ipython_genutils>=0.2.0  # stmol的依赖
+
+# stmol在Streamlit环境中有问题，改用py3Dmol直接渲染
+# stmol>=0.0.8
 nglview>=3.0.3  # 备用

@@ -4,6 +4,7 @@ pharmacophore_streamlit.py - Streamlit集成的药效团生成模块
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -20,7 +21,13 @@ try:
 except ImportError:
     rdShapeHelpers = None
 import py3Dmol
-from stmol import showmol
+# stmol 在Streamlit中可能有问题，使其可选导入
+try:
+    from stmol import showmol
+    STMOL_AVAILABLE = True
+except ImportError:
+    STMOL_AVAILABLE = False
+    showmol = None
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -524,17 +531,21 @@ CC(=O)OC1=CC=CC=C1C(=O)O"""
                     
                     if ensemble_features:
                         st.success(f"✅ 生成 {len(ensemble_features)} 个药效团特征")
-                        
+
                         # 3D可视化
                         st.subheader("3D药效团模型")
                         viewer = generator.visualize_ensemble_pharmacophore_3d(
-                            ensemble_features, 
-                            width=800, 
+                            ensemble_features,
+                            width=800,
                             height=600
                         )
-                        
+
                         # 在Streamlit中显示
-                        showmol(viewer, height=600)
+                        if STMOL_AVAILABLE and showmol:
+                            showmol(viewer, height=600)
+                        else:
+                            st.warning("⚠️ stmol 不可用，使用基础HTML渲染")
+                            st.components.v1.html(viewer._make_html(), height=600, scrolling=True)
                         
                         # 2D统计图
                         st.subheader("特征统计")
