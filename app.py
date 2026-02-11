@@ -538,9 +538,9 @@ tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs([
     "🔍 化学依据",
     "🎯 药效团设计",
     "📊 模型分析",
+    "🔬 技术详情",
     "🔗 3D结构",
     "🛡️ 药物筛选",
-    "🔬 技术详情",
     "📚 关于项目"
 ])
 
@@ -553,54 +553,34 @@ with tab1:
         [
             "🤖 标准模式 (随机森林)",
             "🧠 高级模式 (GNN图神经网络)",
-            "⚡ 双模型对比",
-            "📚 示例分子"
+            "⚡ 双模型对比"
         ],
         horizontal=True,
         key="pred_mode"
     )
-    
+
     # 输入区域
-    if prediction_mode != "📚 示例分子":
-        smiles_input = st.text_area(
-            "**输入SMILES字符串**",
-            value="Brc1cccc(Nc2ncnc3cc4ccccc4cc23)c1",
-            height=100,
-            help="输入分子SMILES表示，如: Cc1cc(C)c(/C=C2\\C(=O)Nc3ncnc(Nc4ccc(F)c(Cl)c4)c32)oc1C",
-            key="smiles_input"
-        )
-    
-    # 示例分子选择
-    if prediction_mode == "📚 示例分子":
-        example_molecules = {
-            "吉非替尼 (EGFR抑制剂)": "COC1=C(C=C2C(=C1)N=CN=C2C3=CC(=C(C=C3)F)Cl)OCCCN4CCOCC4",
-            "高活性EGFR抑制剂": "Brc1cccc(Nc2ncnc3cc4ccccc4cc23)c1",
-            "阿司匹林 (非活性对照)": "CC(=O)OC1=CC=CC=C1C(=O)O",
-            "咖啡因 (非活性对照)": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
-        }
+    smiles_input = st.text_area(
+        "**输入SMILES字符串**",
+        value="Brc1cccc(Nc2ncnc3cc4ccccc4cc23)c1",
+        height=100,
+        help="输入分子SMILES表示，如: Cc1cc(C)c(/C=C2\\C(=O)Nc3ncnc(Nc4ccc(F)c(Cl)c4)c32)oc1C",
+        key="smiles_input"
+    )
 
-        selected_example = st.selectbox("选择示例分子:", list(example_molecules.keys()))
-        smiles_input = example_molecules[selected_example]
-        st.code(smiles_input)
+    # 预测按钮
+    actual_prediction_mode = prediction_mode
+    # 输入验证
+    smiles_clean = smiles_input.strip()
 
-        # 示例分子自动预测按钮
-        if st.button("🚀 使用示例分子进行预测", type="primary", use_container_width=True, key="example_predict"):
-            # 使用选择的示例进行预测
-            actual_prediction_mode = "⚡ 双模型对比"
+    # 检查输入长度
+    if len(smiles_clean) > MAX_SMILES_LENGTH:
+        st.error(f"❌ 输入的 SMILES 字符串过长（超过 {MAX_SMILES_LENGTH} 字符），请缩短后重试")
+    elif not smiles_clean:
+        st.warning("请输入有效的SMILES字符串")
+    elif not validate_smiles(smiles_clean):
+        st.error("❌ 无效的 SMILES 字符串，请检查格式后重试")
     else:
-        # 预测按钮（非示例模式）
-        actual_prediction_mode = prediction_mode
-        # 输入验证
-        smiles_clean = smiles_input.strip()
-
-        # 检查输入长度
-        if len(smiles_clean) > MAX_SMILES_LENGTH:
-            st.error(f"❌ 输入的 SMILES 字符串过长（超过 {MAX_SMILES_LENGTH} 字符），请缩短后重试")
-        elif not smiles_clean:
-            st.warning("请输入有效的SMILES字符串")
-        elif not validate_smiles(smiles_clean):
-            st.error("❌ 无效的 SMILES 字符串，请检查格式后重试")
-        else:
             # 更新预测计数
             st.session_state.prediction_count += 1
             st.session_state.last_smiles = smiles_clean
