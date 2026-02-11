@@ -55,9 +55,14 @@ try:
     from structure_viz import StructureVisualizer
     from stmol import showmol
     VIZ_AVAILABLE = True
-except ImportError:
+    VIZ_ERROR = None
+except Exception as e:
     VIZ_AVAILABLE = False
-    logging.warning("3D可视化依赖缺失 (stmol, py3DMol)")
+    VIZ_ERROR = str(e)
+    # 同时在后台打印详细错误
+    import traceback
+    logging.error(f"3D可视化模块导入失败: {e}")
+    logging.error(traceback.format_exc())
 
 # ========== 配置类 ==========
 class Config:
@@ -806,7 +811,9 @@ with tab7:
     st.header("🔗 蛋白质-配体 3D 结构可视化")
     
     if not VIZ_AVAILABLE:
-        st.error("⚠️ 缺少可视化组件。请在 requirements.txt 中添加 `stmol` 和 `py3Dmol`。")
+        st.error("⚠️ 可视化模块加载失败")
+        st.code(f"错误详情: {VIZ_ERROR}", language="text")
+        st.info("请根据上方错误详情检查：\n1. requirements.txt 是否安装成功\n2. structure_viz.py 文件是否存在\n3. 代码是否有语法错误")
     else:
         # 布局：左侧控制，右侧显示
         col_ctrl, col_view = st.columns([1, 3])
