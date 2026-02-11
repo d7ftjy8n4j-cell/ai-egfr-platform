@@ -99,6 +99,36 @@ console_handler.setLevel(Config.LOG_LEVEL)
 console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logging.getLogger().addHandler(console_handler)
 
+
+# ========== 新增：缓存 3D 视图生成 ==========
+# 使用 cache_resource 因为 view 是一个复杂的对象
+@st.cache_resource
+def get_3d_view(pdb_data, style, color_scheme, show_ligand, show_surface, surface_opacity):
+    """
+    缓存 3D 视图对象。
+    只有当传入的参数发生变化时，才会重新创建 view 对象。
+    这能有效防止页面无限刷新。
+    """
+    if not pdb_data:
+        return None
+    
+    # 临时实例化 Visualizer 来利用它的逻辑
+    # 注意：我们需要在这里引用 StructureVisualizer，确保它已导入
+    from structure_viz import StructureVisualizer 
+    
+    viz_tool = StructureVisualizer()
+    viz_tool.pdb_data = pdb_data
+    
+    # 调用渲染方法
+    view = viz_tool.render_view(
+        style=style,
+        color_scheme=color_scheme,
+        show_ligand=show_ligand,
+        show_surface=show_surface,
+        surface_opacity=surface_opacity
+    )
+    return view
+
 # 定义常量（从 Config 类中获取，保持向后兼容）
 PROBABILITY_THRESHOLD = Config.PROBABILITY_THRESHOLD
 MAX_SMILES_LENGTH = Config.MAX_SMILES_LENGTH
@@ -867,19 +897,32 @@ with tab7:
         # --- 右侧显示区 ---
         with col_view:
             if st.session_state.viz_data_loaded:
-                st.info(f"正在查看: **{viz_tool.pdb_id}**")
+                # 获取当前的 PDB 数据字符串
+                # 注意：我们使用 session_state 中存储的原始字符串，确保传递给缓存函数的是不可变数据
+                current_pdb_data = st.session_state.get('viz_raw_data')
+                current_pdb_id = st.session_state.get('viz_pdb_id', 'Unknown')
+                
+                st.info(f"正在查看: **{current_pdb_id}**")
                 
                 # 生成视图
                 try:
-                    view = viz_tool.render_view(
+                    # ================== 修复代码 ==================
+                    # 调用缓存函数，而不是直接调用 viz_tool.render_view
+                    view = get_3d_view(
+                        pdb_data=current_pdb_data,
                         style=style_select,
                         color_scheme=color_select,
                         show_ligand=show_ligand,
                         show_surface=show_surface,
                         surface_opacity=surface_opacity
                     )
+                    # ============================================
+                    
                     # 在 Streamlit 中显示
-                    showmol(view, height=600, width=800)
+                    if view:
+                        showmol(view, height=600, width=800)
+                    else:
+                        st.error("视图生成失败")
                     
                     st.caption("💡 操作提示: 鼠标左键旋转，右键/Ctrl+左键平移，滚轮缩放。")
                     
