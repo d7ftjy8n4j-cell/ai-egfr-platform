@@ -4,34 +4,51 @@ app.py - EGFR抑制剂智能预测系统（双引擎版）
 版本：1.0.0
 """
 
-# ========== 修复导入 ==========
+# ========== 基础导入 ==========
 import sys
 import os
-import streamlit as st
+import logging
+from datetime import datetime
 
-# 添加当前目录到Python路径
+# ========== 设置页面（必须在任何Streamlit命令之前） ==========
+import streamlit as st
+st.set_page_config(
+    page_title="EGFR抑制剂智能预测系统 (双引擎)",
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ========== 初始化 Session State ==========
+if 'last_smiles' not in st.session_state:
+    st.session_state.last_smiles = ""
+if 'prediction_count' not in st.session_state:
+    st.session_state.prediction_count = 0
+if 'last_rf_result' not in st.session_state:
+    st.session_state.last_rf_result = None
+if 'last_gnn_result' not in st.session_state:
+    st.session_state.last_gnn_result = None
+if 'advanced_analysis_triggered' not in st.session_state:
+    st.session_state.advanced_analysis_triggered = False
+
+# ========== 添加路径 ==========
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# 尝试导入药效团模块
+# ========== 导入药效团模块（不使用Streamlit UI） ==========
 try:
     import pharmacophore_streamlit
     PHARMACOPHORE_AVAILABLE = True
-    st.sidebar.success("✅ 药效团模块加载成功")
+    logging.info("药效团模块加载成功")
 except ImportError as e:
     PHARMACOPHORE_AVAILABLE = False
-    st.sidebar.error(f"❌ 药效团模块导入失败: {e}")
-    # 显示详细错误信息
-    import traceback
-    st.sidebar.code(traceback.format_exc())
+    logging.error(f"药效团模块导入失败: {e}")
 
-# 其他导入
+# ========== 其他导入 ==========
 import pandas as pd
 import numpy as np
 import joblib
 import json
 import re
-from datetime import datetime
-import logging
 
 # ========== 配置类 ==========
 class Config:
@@ -68,31 +85,10 @@ console_handler.setLevel(Config.LOG_LEVEL)
 console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logging.getLogger().addHandler(console_handler)
 
-# ========== 初始化 Session State ==========
-# 必须在页面配置后、使用 session_state 之前初始化
-if 'last_smiles' not in st.session_state:
-    st.session_state.last_smiles = ""
-if 'prediction_count' not in st.session_state:
-    st.session_state.prediction_count = 0
-if 'last_rf_result' not in st.session_state:
-    st.session_state.last_rf_result = None
-if 'last_gnn_result' not in st.session_state:
-    st.session_state.last_gnn_result = None
-if 'advanced_analysis_triggered' not in st.session_state:
-    st.session_state.advanced_analysis_triggered = False
-
 # 定义常量（从 Config 类中获取，保持向后兼容）
 PROBABILITY_THRESHOLD = Config.PROBABILITY_THRESHOLD
 MAX_SMILES_LENGTH = Config.MAX_SMILES_LENGTH
 BASE_DIR = Config.BASE_DIR
-
-# 设置页面
-st.set_page_config(
-    page_title="EGFR抑制剂智能预测系统 (双引擎)",
-    page_icon="🧬",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # ========== 0. 辅助函数 ==========
 def get_model_performance(model_type='rf', predictor=None):
@@ -206,6 +202,12 @@ except ImportError as e:
     CHEM_INSIGHT_AVAILABLE = False
     st.sidebar.warning(f"⚠️ 化学洞察模块导入失败: {e}")
     logging.warning(f"化学洞察模块导入失败: {e}")
+
+# 药效团模块状态显示（侧边栏）
+if PHARMACOPHORE_AVAILABLE:
+    st.sidebar.success("✅ 药效团模块就绪")
+else:
+    st.sidebar.warning("⚠️ 药效团模块未加载")
 
 # ========== 2. 应用标题与介绍 ==========
 st.title("🧬 EGFR抑制剂智能预测系统")
