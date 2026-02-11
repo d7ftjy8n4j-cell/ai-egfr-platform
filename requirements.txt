@@ -32,3 +32,8 @@ requests>=2.31.0
 # 修复streamlit依赖版本冲突（精确锁定版本，放在前面）
 rich==13.7.1
 markdown-it-py<3
+
+# 添加
+py3Dmol>=2.0.1
+stmol>=0.0.8
+nglview>=3.0.3  # 备用
