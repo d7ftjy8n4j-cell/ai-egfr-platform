@@ -1,7 +1,6 @@
 """
 chem_filter.py
 药物筛选模块：ADME规则 (Lipinski) 和 不良子结构 (PAINS/Brenk)
-基于 TeachOpenCADD T002 & T003
 """
 
 import math

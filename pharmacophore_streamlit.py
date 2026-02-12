@@ -1,6 +1,5 @@
 """
 pharmacophore_streamlit.py - Streamlit集成的药效团生成模块
-基于TeachOpenCADD T009，简化并适配Streamlit Web界面
 """
 
 import streamlit as st
@@ -651,7 +650,7 @@ CC(=O)OC1=CC=CC=C1C(=O)O"""
 # 独立运行
 if __name__ == "__main__":
     st.set_page_config(
-        page_title="药效团生成器 - TeachOpenCADD T009",
+        page_title="药效团生成器",
         page_icon="🎯",
         layout="wide"
     )

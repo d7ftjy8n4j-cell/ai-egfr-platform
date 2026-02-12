@@ -1,6 +1,5 @@
 """
 pharmacophore_streamlit.py - Streamlit集成的药效团生成模块
-基于TeachOpenCADD T009，简化并适配Streamlit Web界面
 """
 
 import streamlit as st

@@ -1191,7 +1191,7 @@ with tab6:
 
     本项目基于以下开源教育资源构建:
 
-    - **TeachOpenCADD** 平台提供的T001、T007、T009、T033、T035等教程
+    - **TeachOpenCADD** 提供的教程
     - **ChEMBL** 数据库提供的EGFR抑制剂活性数据
     - **RDKit** 开源化学信息学工具包
     - **PyTorch Geometric** 图神经网络库
@@ -1277,7 +1277,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-    🧬 EGFR抑制剂双引擎智能预测系统 | 传统随机森林 + 深度学习集成 | © 2026
+    🧬 EGFR抑制剂双引擎智能预测系统 | RE + 深度学习集成 | © 2026
     <br>
     <small>基于TeachOpenCADD教程构建 | 仅供学术研究使用</small>
     </div>

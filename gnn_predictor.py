@@ -1,7 +1,7 @@
 """
 gnn_predictor.py - GNN预测器 (适配您训练好的EGFR GCN模型)
 用于Streamlit应用集成，将SMILES字符串转换为分子图并进行活性预测
-作者：基于T035教程和您的训练模型适配
+作者：dadamingli
 """
 
 import torch

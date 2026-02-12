@@ -481,7 +481,7 @@ def render_safe_chem_insight():
 # 主函数
 def main():
     st.set_page_config(
-        page_title="化学洞察 - TeachOpenCADD T004+T033",
+        page_title="化学洞察",
         page_icon="🔍",
         layout="wide"
     )
