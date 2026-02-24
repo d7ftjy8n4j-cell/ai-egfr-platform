@@ -563,19 +563,20 @@ def compare_results(rf_result, gnn_result):
                 """)
 
 # ========== 5. 主界面 - 标签页设计 ==========
-tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs([
-    "🧪 分子预测",
-    "🔍 化学依据",
-    "🎯 药效团设计",
-    "📊 模型分析",
-    "🔬 技术详情",
-    "🔗 3D结构",
-    "🛡️ 药物筛选",
-    "📚 关于项目"
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "🧪 分子预测",        # 核心活性预测
+    "🛡️ 药物筛选",        # 成药性与安全性
+    "🔍 化学依据",        # 理化性质与相似性
+    "🎯 药效团设计",      # 活性特征提取与设计指导
+    "🔗 3D结构",          # 蛋白-配体三维可视化
+    "📊 模型分析",        # 模型性能与特征重要性
+    "🔬 技术详情",        # 技术实现细节
+    "📚 关于项目"         # 背景与致谢
 ])
 
 with tab1:
     st.header("🧪 分子活性预测")
+    st.caption("输入 SMILES，选择预测模式，快速评估分子对 EGFR 的抑制活性。双模型对比可提高结果可靠性。")
     
     # 预测模式选择
     prediction_mode = st.radio(
@@ -722,264 +723,8 @@ with tab1:
                 status_text.empty()
 
 with tab2:
-    st.header("🔍 化学依据分析")
-    if CHEM_INSIGHT_AVAILABLE:
-        render_safe_chem_insight()
-    else:
-        st.error("化学洞察模块不可用")
-        st.code("请确保 chem_insight_safe.py 和 molecule_utils.py 文件存在")
-
-with tab3:
-    st.header("🎯 药效团设计")
-    if PHARMACOPHORE_AVAILABLE:
-        pharmacophore_streamlit.render_pharmacophore_tab()
-    else:
-        st.error("药效团模块不可用")
-        st.code("请确保 pharmacophore_streamlit.py 文件存在")
-
-with tab4:
-    st.header("📊 模型性能分析")
-
-    rf_perf = get_model_performance('rf')
-    gnn_perf = get_model_performance('gnn')
-
-    # 获取图片路径
-    feature_img_path = os.path.join(BASE_DIR, "feature_importance.png")
-    gcn_img_path = os.path.join(BASE_DIR, "gcn_confusion_matrix.png")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("随机森林模型")
-        st.metric("AUC", str(rf_perf.get('auc', 'N/A')), "优秀")
-        st.metric("准确率", str(rf_perf.get('accuracy', 'N/A')), "良好")
-        st.metric("特征数量", rf_perf.get('feature_count', 'N/A'), "RDKit描述符")
-
-        with st.expander("📈 特征重要性"):
-            st.image(feature_img_path if os.path.exists(feature_img_path) else
-                    "https://via.placeholder.com/400x200?text=特征重要性图",
-                    caption="随机森林特征重要性排序")
-
-    with col2:
-        st.subheader("GNN模型")
-        st.metric("AUC", str(gnn_perf.get('auc', 'N/A')), "良好")
-        st.metric("准确率", str(gnn_perf.get('accuracy', 'N/A')), "良好")
-        st.metric("节点特征", gnn_perf.get('node_features', 'N/A'), "原子级特征")
-
-    with st.expander("📈 混淆矩阵"):
-        st.image(gcn_img_path if os.path.exists(gcn_img_path) else
-                    "https://via.placeholder.com/400x200?text=GNN混淆矩阵",
-                    caption="GNN模型混淆矩阵")
-
-    # 模型对比说明
-    st.markdown("---")
-    st.subheader("🎯 模型选择建议")
-
-    advice_data = {
-        "推荐场景": ["已知分子描述符", "分子结构图", "需要解释性", "追求前沿技术"],
-        "随机森林": ["✅ 优秀", "❌ 不适用", "✅ 特征重要性", "较传统"],
-        "GNN": ["❌ 不需要", "✅ 优秀", "❌ 黑盒性", "✅ 前沿"]
-    }
-
-    st.table(pd.DataFrame(advice_data))
-
-with tab5:
-    st.header("🔬 技术实现详情")
-
-    st.markdown("""
-    ### 🏗️ 系统架构
-
-    **双引擎预测架构**:
-    ```
-    输入层 (SMILES)
-        ├── 随机森林分支 → RDKit特征提取 → 随机森林模型 → 预测结果
-        └── GNN分支 → 分子图转换 → 图卷积网络 → 预测结果
-    ```
-
-    ### 🔧 技术栈
-
-    | 组件 | 技术选择 | 用途 |
-    |------|----------|------|
-    | **前端界面** | Streamlit | 交互式Web应用 |
-    | **传统ML** | Scikit-learn + RDKit | 随机森林模型训练与预测 |
-    | **深度学习** | PyTorch + PyTorch Geometric | GNN模型训练与预测 |
-    | **化学计算** | RDKit | 分子特征计算与可视化 |
-    | **数据管理** | Pandas + NumPy | 数据处理与分析 |
-
-    ### 📐 特征工程对比
-
-    **随机森林特征** (200+维度):
-    - 物理化学性质: LogP, 分子量, 氢键供体/受体等
-    - 结构特征: 芳香环数, 可旋转键数, 拓扑极性表面积等
-    - 原子计数: C, N, O, F等原子类型统计
-
-    **GNN特征** (12维原子特征):
-    - 原子级特征: 原子序数, 杂化类型, 形式电荷, 芳香性等
-    - 键级特征: 键类型, 共轭性, 环内键等
-    - 通过图卷积层自动学习分子结构表示
-
-    ### 🎯 模型性能
-
-    | 指标 | 随机森林 | GNN | 说明 |
-    |------|----------|-----|------|
-    | **AUC** | 0.855 | 0.808 | 随机森林略优 |
-    | **准确率** | 0.830 | 0.765 | 随机森林更稳定 |
-    | **可解释性** | 高 | 中 | RF有特征重要性 |
-    | **泛化能力** | 强 | 较强 | 均表现良好 |
-    | **创新性** | 传统 | 前沿 | GNN代表AI趋势 |
-    """)
-
-with tab7:
-    st.header("🔗 蛋白质-配体 3D 结构可视化")
-    
-    if not VIZ_AVAILABLE:
-        st.error("⚠️ 可视化模块加载失败")
-        st.code(f"错误详情: {VIZ_ERROR}", language="text")
-        st.info("请根据上方错误详情检查：\n1. requirements.txt 是否安装成功\n2. structure_viz.py 文件是否存在\n3. 代码是否有语法错误")
-    else:
-        # 布局：左侧控制，右侧显示
-        col_ctrl, col_view = st.columns([1, 3])
-        
-        # 初始化 Session State 用于存储 PDB 数据
-        if 'viz_pdb_id' not in st.session_state:
-            st.session_state.viz_pdb_id = "3POZ"
-        if 'viz_data_loaded' not in st.session_state:
-            st.session_state.viz_data_loaded = False
-        
-        # --- 左侧控制栏 ---
-        with col_ctrl:
-            st.subheader("1. 数据加载")
-            input_mode = st.radio("来源:", ["PDB ID", "上传文件"])
-            
-            viz_tool = StructureVisualizer()
-            load_success = False
-            
-            if input_mode == "PDB ID":
-                pdb_input = st.text_input("输入 ID", value=st.session_state.viz_pdb_id).upper()
-                if st.button("📥 加载 PDB", use_container_width=True):
-                    with st.spinner("下载中..."):
-                        if viz_tool.load_from_pdb_id(pdb_input):
-                            st.session_state.viz_pdb_id = pdb_input
-                            st.session_state.viz_data_loaded = True
-                            st.session_state.viz_data_source = "remote"
-                            # 将数据存入 session 以便重绘时无需重新下载
-                            st.session_state.viz_raw_data = viz_tool.pdb_data
-                            load_success = True
-                        else:
-                            st.error("无效的 PDB ID")
-            else:
-                uploaded_file = st.file_uploader("上传 .pdb", type="pdb")
-                if uploaded_file:
-                    viz_tool.load_from_file(uploaded_file)
-                    st.session_state.viz_data_loaded = True
-                    st.session_state.viz_data_source = "local"
-                    st.session_state.viz_raw_data = viz_tool.pdb_data
-                    load_success = True
-
-            st.markdown("---")
-            st.subheader("2. 样式设置")
-            
-            # 从 Session 恢复数据 (如果只是调整样式，不需要重新下载)
-            if st.session_state.viz_data_loaded and not load_success:
-                viz_tool.pdb_data = st.session_state.viz_raw_data
-                viz_tool.pdb_id = st.session_state.get('viz_pdb_id', 'Unknown')
-            
-            style_select = st.selectbox("蛋白样式", ["cartoon", "stick", "line", "sphere"], index=0)
-            color_select = st.selectbox("配色方案", ["spectrum", "chain", "residue"], index=0)
-            
-            show_ligand = st.toggle("显示配体/药物", value=True)
-            show_surface = st.toggle("显示蛋白表面", value=False)
-            
-            surface_opacity = 0.5
-            if show_surface:
-                surface_opacity = st.slider("表面透明度", 0.0, 1.0, 0.5, 0.1)
-
-            # ========== 新增：刷新控制功能 ==========
-            st.markdown("---")
-            st.subheader("3. 刷新控制")
-            
-            # 定义一个 session state 来存储"实际渲染"的参数
-            if 'render_params' not in st.session_state:
-                st.session_state.render_params = {
-                    'style': 'cartoon', 'color': 'spectrum', 
-                    'ligand': True, 'surface': False, 'opacity': 0.5
-                }
-
-            # 暂停开关
-            pause_refresh = st.toggle("⏸️ 暂停实时刷新", value=False, help="开启后，修改上方样式不会立即触发重绘，需点击'手动刷新'按钮。")
-            
-            do_update = False
-            
-            if pause_refresh:
-                # 暂停模式：只有点击按钮才更新
-                if st.button("🔄 手动刷新视图", type="primary", use_container_width=True):
-                    do_update = True
-                else:
-                    st.caption("⚠️ 视图已锁定，修改样式后请点击上方按钮更新。")
-            else:
-                # 实时模式：只要参数变了就更新
-                do_update = True
-
-            # 决定最终传给渲染器的参数
-            if do_update:
-                st.session_state.render_params = {
-                    'style': style_select,
-                    'color': color_select,
-                    'ligand': show_ligand,
-                    'surface': show_surface,
-                    'opacity': surface_opacity
-                }
-            
-            # 获取当前用于渲染的参数（可能是旧的，也可能是新的）
-            current_render = st.session_state.render_params
-
-        # --- 右侧显示区 ---
-        with col_view:
-            if st.session_state.viz_data_loaded:
-                # 获取当前的 PDB 数据字符串
-                # 注意：我们使用 session_state 中存储的原始字符串，确保传递给缓存函数的是不可变数据
-                current_pdb_data = st.session_state.get('viz_raw_data')
-                current_pdb_id = st.session_state.get('viz_pdb_id', 'Unknown')
-                
-                st.info(f"正在查看: **{current_pdb_id}**")
-                
-                # 生成视图
-                try:
-                    # ================== 修复代码 ==================
-                    # 调用缓存函数，而不是直接调用 viz_tool.render_view
-                    # 使用 current_render 中的参数，而不是 widget 变量
-                    view = get_3d_view(
-                        pdb_data=current_pdb_data,
-                        style=current_render['style'],
-                        color_scheme=current_render['color'],
-                        show_ligand=current_render['ligand'],
-                        show_surface=current_render['surface'],
-                        surface_opacity=current_render['opacity']
-                    )
-                    # ============================================
-                    
-                    # 在 Streamlit 中显示
-                    if view:
-                        showmol(view, height=600, width=800)
-                    else:
-                        st.error("视图生成失败")
-                    
-                    st.caption("💡 操作提示: 鼠标左键旋转，右键/Ctrl+左键平移，滚轮缩放。")
-                    
-                except Exception as e:
-                    st.error(f"渲染失败: {e}")
-            else:
-                # 初始空状态占位
-                st.info("👈 请在左侧加载蛋白质结构")
-                st.markdown("""
-                **推荐的 EGFR 相关结构:**
-                * `3POZ`: EGFR 激酶结构域 + 抑制剂 Tak-285
-                * `1M17`: EGFR + 埃罗替尼 (Erlotinib)
-                * `2ITY`: EGFR + 吉非替尼 (Gefitinib)
-                """)
-
-with tab8:
     st.header("🛡️ 药物类属性与安全性筛选")
+    st.caption("评估化合物的成药潜力：Lipinski 五规则（ADME）和毒性警报（PAINS/Brenk）。单分子或批量筛选。")
 
     if not FILTER_AVAILABLE:
         st.error("筛选模块未加载，请检查 chem_filter.py 文件")
@@ -1151,8 +896,271 @@ with tab8:
                             "text/csv"
                         )
 
+with tab3:
+    st.header("🔍 化学依据分析")
+    st.caption("计算分子理化性质（LogP、分子量等）、基于 Morgan 指纹的相似性搜索，以及多种分子表示对比。")
+    if CHEM_INSIGHT_AVAILABLE:
+        render_safe_chem_insight()
+    else:
+        st.error("化学洞察模块不可用")
+        st.code("请确保 chem_insight_safe.py 和 molecule_utils.py 文件存在")
+
+with tab4:
+    st.header("🎯 药效团设计")
+    st.caption("从活性分子中提取共同药效团特征（氢键供/受体、疏水区等），生成 3D 药效团模型，指导分子优化。")
+    if PHARMACOPHORE_AVAILABLE:
+        pharmacophore_streamlit.render_pharmacophore_tab()
+    else:
+        st.error("药效团模块不可用")
+        st.code("请确保 pharmacophore_streamlit.py 文件存在")
+
+with tab5:
+    st.header("🔗 蛋白质-配体 3D 结构可视化")
+    st.caption("加载蛋白质-配体复合物（PDB ID 或本地文件），交互式查看三维结构及相互作用。")
+    
+    if not VIZ_AVAILABLE:
+        st.error("⚠️ 可视化模块加载失败")
+        st.code(f"错误详情: {VIZ_ERROR}", language="text")
+        st.info("请根据上方错误详情检查：\n1. requirements.txt 是否安装成功\n2. structure_viz.py 文件是否存在\n3. 代码是否有语法错误")
+    else:
+        # 布局：左侧控制，右侧显示
+        col_ctrl, col_view = st.columns([1, 3])
+        
+        # 初始化 Session State 用于存储 PDB 数据
+        if 'viz_pdb_id' not in st.session_state:
+            st.session_state.viz_pdb_id = "3POZ"
+        if 'viz_data_loaded' not in st.session_state:
+            st.session_state.viz_data_loaded = False
+        
+        # --- 左侧控制栏 ---
+        with col_ctrl:
+            st.subheader("1. 数据加载")
+            input_mode = st.radio("来源:", ["PDB ID", "上传文件"])
+            
+            viz_tool = StructureVisualizer()
+            load_success = False
+            
+            if input_mode == "PDB ID":
+                pdb_input = st.text_input("输入 ID", value=st.session_state.viz_pdb_id).upper()
+                if st.button("📥 加载 PDB", use_container_width=True):
+                    with st.spinner("下载中..."):
+                        if viz_tool.load_from_pdb_id(pdb_input):
+                            st.session_state.viz_pdb_id = pdb_input
+                            st.session_state.viz_data_loaded = True
+                            st.session_state.viz_data_source = "remote"
+                            # 将数据存入 session 以便重绘时无需重新下载
+                            st.session_state.viz_raw_data = viz_tool.pdb_data
+                            load_success = True
+                        else:
+                            st.error("无效的 PDB ID")
+            else:
+                uploaded_file = st.file_uploader("上传 .pdb", type="pdb")
+                if uploaded_file:
+                    viz_tool.load_from_file(uploaded_file)
+                    st.session_state.viz_data_loaded = True
+                    st.session_state.viz_data_source = "local"
+                    st.session_state.viz_raw_data = viz_tool.pdb_data
+                    load_success = True
+
+            st.markdown("---")
+            st.subheader("2. 样式设置")
+            
+            # 从 Session 恢复数据 (如果只是调整样式，不需要重新下载)
+            if st.session_state.viz_data_loaded and not load_success:
+                viz_tool.pdb_data = st.session_state.viz_raw_data
+                viz_tool.pdb_id = st.session_state.get('viz_pdb_id', 'Unknown')
+            
+            style_select = st.selectbox("蛋白样式", ["cartoon", "stick", "line", "sphere"], index=0)
+            color_select = st.selectbox("配色方案", ["spectrum", "chain", "residue"], index=0)
+            
+            show_ligand = st.toggle("显示配体/药物", value=True)
+            show_surface = st.toggle("显示蛋白表面", value=False)
+            
+            surface_opacity = 0.5
+            if show_surface:
+                surface_opacity = st.slider("表面透明度", 0.0, 1.0, 0.5, 0.1)
+
+            # ========== 新增：刷新控制功能 ==========
+            st.markdown("---")
+            st.subheader("3. 刷新控制")
+            
+            # 定义一个 session state 来存储"实际渲染"的参数
+            if 'render_params' not in st.session_state:
+                st.session_state.render_params = {
+                    'style': 'cartoon', 'color': 'spectrum', 
+                    'ligand': True, 'surface': False, 'opacity': 0.5
+                }
+
+            # 暂停开关
+            pause_refresh = st.toggle("⏸️ 暂停实时刷新", value=False, help="开启后，修改上方样式不会立即触发重绘，需点击'手动刷新'按钮。")
+            
+            do_update = False
+            
+            if pause_refresh:
+                # 暂停模式：只有点击按钮才更新
+                if st.button("🔄 手动刷新视图", type="primary", use_container_width=True):
+                    do_update = True
+                else:
+                    st.caption("⚠️ 视图已锁定，修改样式后请点击上方按钮更新。")
+            else:
+                # 实时模式：只要参数变了就更新
+                do_update = True
+
+            # 决定最终传给渲染器的参数
+            if do_update:
+                st.session_state.render_params = {
+                    'style': style_select,
+                    'color': color_select,
+                    'ligand': show_ligand,
+                    'surface': show_surface,
+                    'opacity': surface_opacity
+                }
+            
+            # 获取当前用于渲染的参数（可能是旧的，也可能是新的）
+            current_render = st.session_state.render_params
+
+        # --- 右侧显示区 ---
+        with col_view:
+            if st.session_state.viz_data_loaded:
+                # 获取当前的 PDB 数据字符串
+                # 注意：我们使用 session_state 中存储的原始字符串，确保传递给缓存函数的是不可变数据
+                current_pdb_data = st.session_state.get('viz_raw_data')
+                current_pdb_id = st.session_state.get('viz_pdb_id', 'Unknown')
+                
+                st.info(f"正在查看: **{current_pdb_id}**")
+                
+                # 生成视图
+                try:
+                    # ================== 修复代码 ==================
+                    # 调用缓存函数，而不是直接调用 viz_tool.render_view
+                    # 使用 current_render 中的参数，而不是 widget 变量
+                    view = get_3d_view(
+                        pdb_data=current_pdb_data,
+                        style=current_render['style'],
+                        color_scheme=current_render['color'],
+                        show_ligand=current_render['ligand'],
+                        show_surface=current_render['surface'],
+                        surface_opacity=current_render['opacity']
+                    )
+                    # ============================================
+                    
+                    # 在 Streamlit 中显示
+                    if view:
+                        showmol(view, height=600, width=800)
+                    else:
+                        st.error("视图生成失败")
+                    
+                    st.caption("💡 操作提示: 鼠标左键旋转，右键/Ctrl+左键平移，滚轮缩放。")
+                    
+                except Exception as e:
+                    st.error(f"渲染失败: {e}")
+            else:
+                # 初始空状态占位
+                st.info("👈 请在左侧加载蛋白质结构")
+                st.markdown("""
+                **推荐的 EGFR 相关结构:**
+                * `3POZ`: EGFR 激酶结构域 + 抑制剂 Tak-285
+                * `1M17`: EGFR + 埃罗替尼 (Erlotinib)
+                * `2ITY`: EGFR + 吉非替尼 (Gefitinib)
+                """)
+
 with tab6:
+    st.header("📊 模型性能分析")
+    st.caption("查看双引擎模型的性能指标（AUC、准确率）、特征重要性排序和混淆矩阵。")
+
+    rf_perf = get_model_performance('rf')
+    gnn_perf = get_model_performance('gnn')
+
+    # 获取图片路径
+    feature_img_path = os.path.join(BASE_DIR, "feature_importance.png")
+    gcn_img_path = os.path.join(BASE_DIR, "gcn_confusion_matrix.png")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("随机森林模型")
+        st.metric("AUC", str(rf_perf.get('auc', 'N/A')), "优秀")
+        st.metric("准确率", str(rf_perf.get('accuracy', 'N/A')), "良好")
+        st.metric("特征数量", rf_perf.get('feature_count', 'N/A'), "RDKit描述符")
+
+        with st.expander("📈 特征重要性"):
+            st.image(feature_img_path if os.path.exists(feature_img_path) else
+                    "https://via.placeholder.com/400x200?text=特征重要性图",
+                    caption="随机森林特征重要性排序")
+
+    with col2:
+        st.subheader("GNN模型")
+        st.metric("AUC", str(gnn_perf.get('auc', 'N/A')), "良好")
+        st.metric("准确率", str(gnn_perf.get('accuracy', 'N/A')), "良好")
+        st.metric("节点特征", gnn_perf.get('node_features', 'N/A'), "原子级特征")
+
+    with st.expander("📈 混淆矩阵"):
+        st.image(gcn_img_path if os.path.exists(gcn_img_path) else
+                    "https://via.placeholder.com/400x200?text=GNN混淆矩阵",
+                    caption="GNN模型混淆矩阵")
+
+    # 模型对比说明
+    st.markdown("---")
+    st.subheader("🎯 模型选择建议")
+
+    advice_data = {
+        "推荐场景": ["已知分子描述符", "分子结构图", "需要解释性", "追求前沿技术"],
+        "随机森林": ["✅ 优秀", "❌ 不适用", "✅ 特征重要性", "较传统"],
+        "GNN": ["❌ 不需要", "✅ 优秀", "❌ 黑盒性", "✅ 前沿"]
+    }
+
+    st.table(pd.DataFrame(advice_data))
+
+with tab7:
+    st.header("🔬 技术实现详情")
+    st.caption("系统架构、技术栈、特征工程对比及模型性能详细说明。")
+
+    st.markdown("""
+    ### 🏗️ 系统架构
+
+    **双引擎预测架构**:
+    ```
+    输入层 (SMILES)
+        ├── 随机森林分支 → RDKit特征提取 → 随机森林模型 → 预测结果
+        └── GNN分支 → 分子图转换 → 图卷积网络 → 预测结果
+    ```
+
+    ### 🔧 技术栈
+
+    | 组件 | 技术选择 | 用途 |
+    |------|----------|------|
+    | **前端界面** | Streamlit | 交互式Web应用 |
+    | **传统ML** | Scikit-learn + RDKit | 随机森林模型训练与预测 |
+    | **深度学习** | PyTorch + PyTorch Geometric | GNN模型训练与预测 |
+    | **化学计算** | RDKit | 分子特征计算与可视化 |
+    | **数据管理** | Pandas + NumPy | 数据处理与分析 |
+
+    ### 📐 特征工程对比
+
+    **随机森林特征** (200+维度):
+    - 物理化学性质: LogP, 分子量, 氢键供体/受体等
+    - 结构特征: 芳香环数, 可旋转键数, 拓扑极性表面积等
+    - 原子计数: C, N, O, F等原子类型统计
+
+    **GNN特征** (12维原子特征):
+    - 原子级特征: 原子序数, 杂化类型, 形式电荷, 芳香性等
+    - 键级特征: 键类型, 共轭性, 环内键等
+    - 通过图卷积层自动学习分子结构表示
+
+    ### 🎯 模型性能
+
+    | 指标 | 随机森林 | GNN | 说明 |
+    |------|----------|-----|------|
+    | **AUC** | 0.855 | 0.808 | 随机森林略优 |
+    | **准确率** | 0.830 | 0.765 | 随机森林更稳定 |
+    | **可解释性** | 高 | 中 | RF有特征重要性 |
+    | **泛化能力** | 强 | 较强 | 均表现良好 |
+    | **创新性** | 传统 | 前沿 | GNN代表AI趋势 |
+    """)
+
+with tab8:
     st.header("📚 关于项目")
+    st.caption("项目背景、特色、文件清单及致谢。")
 
     st.markdown("""
     ### 🎯 项目简介
@@ -1265,6 +1273,20 @@ with st.sidebar:
                 logging.info(f"预测结果已导出: {filename}")
             else:
                 st.warning("没有可用的模型结果")
+
+    # ----- 新增：功能导航指南 -----
+    with st.expander("📖 功能导航指南", expanded=False):
+        st.markdown("""
+        - **🧪 分子预测**：核心活性预测，支持单分子/批量
+        - **🛡️ 药物筛选**：成药性评估（Lipinski）与毒性警报（PAINS/Brenk）
+        - **🔍 化学依据**：分子性质计算、相似性搜索、表示对比
+        - **🎯 药效团设计**：提取活性特征，生成 3D 药效团模型
+        - **🔗 3D 结构**：蛋白-配体相互作用可视化
+        - **📊 模型分析**：模型性能、特征重要性、混淆矩阵
+        - **🔬 技术详情**：系统架构、技术栈、特征工程对比
+        - **📚 关于项目**：背景、特色、文件清单、致谢
+        """)
+    # ---------------------------
 
     # 系统信息
     st.subheader("ℹ️ 系统信息")
