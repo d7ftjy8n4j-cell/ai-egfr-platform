@@ -1277,7 +1277,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-    🧬 EGFR抑制剂双引擎智能预测系统 | RE + 深度学习集成 | © 2026
+    🧬 EGFR抑制剂双引擎智能预测系统 | RF + 深度学习集成 | © 2026
     <br>
     <small>基于TeachOpenCADD教程构建 | 仅供学术研究使用</small>
     </div>
