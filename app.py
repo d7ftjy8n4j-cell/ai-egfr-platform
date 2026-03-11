@@ -251,7 +251,7 @@ try:
     if test_predictor.model is None:
         raise Exception("模型加载失败: 模型为None")
     RF_PREDICTOR_AVAILABLE = True
-    st.sidebar.success("✅ 随机森林预测器就绪")
+    # st.sidebar.success("✅ 随机森林预测器就绪")
     logging.info("随机森林预测器导入成功")
 except Exception as e:
     logging.error(f"随机森林预测器失败: {e}")
@@ -286,7 +286,7 @@ try:
     else:
         from gnn_predictor import GCNPredictor
         GNN_PREDICTOR_AVAILABLE = True
-        st.sidebar.success("✅ GNN预测器就绪")
+        # st.sidebar.success("✅ GNN预测器就绪")
         logging.info("GNN预测器导入成功")
 except ImportError as e:
     error_msg = str(e)
@@ -297,7 +297,7 @@ except ImportError as e:
 try:
     from chem_insight_safe import render_safe_chem_insight
     CHEM_INSIGHT_AVAILABLE = True
-    st.sidebar.success("✅ 化学洞察模块就绪")
+    # st.sidebar.success("✅ 化学洞察模块就绪")
     logging.info("化学洞察模块导入成功")
 except ImportError as e:
     CHEM_INSIGHT_AVAILABLE = False
@@ -308,7 +308,7 @@ except ImportError as e:
 try:
     from chem_filter import ADMEFilter, SubstructureFilter
     FILTER_AVAILABLE = True
-    st.sidebar.success("✅ 药物筛选模块就绪")
+    # st.sidebar.success("✅ 药物筛选模块就绪")
     logging.info("药物筛选模块导入成功")
 except ImportError:
     FILTER_AVAILABLE = False
@@ -316,18 +316,19 @@ except ImportError:
     logging.warning("药物筛选模块导入失败")
 
 # 药效团模块状态显示（侧边栏）
-if PHARMACOPHORE_AVAILABLE:
-    st.sidebar.success("✅ 药效团模块就绪")
-else:
-    st.sidebar.warning("⚠️ 药效团模块未加载")
+# if PHARMACOPHORE_AVAILABLE:
+#     st.sidebar.success("✅ 药效团模块就绪")
+# else:
+#     st.sidebar.warning("⚠️ 药效团模块未加载")
 
 # ========== 2. 应用标题与介绍 ==========
-st.title("🧬 EGFR抑制剂智能预测系统")
+st.title("🧬 药尘光 · EGFR抑制剂智能发现平台")
 st.markdown("""
-**双引擎预测系统** - 集成传统机器学习与深度学习技术  
-- **🧪 标准模式**: 基于随机森林与分子描述符  
-- **🧠 高级模式**: 基于图神经网络(GNN)与分子结构图  
+**双引擎预测系统** —— 集成传统机器学习与深度学习技术
+- **🧪 标准模式**: 基于随机森林与分子描述符
+- **🧠 高级模式**: 基于图神经网络(GNN)与分子结构图
 - **📊 对比分析**: 双模型结果对比与一致性验证
+*"双核驱动，理形相生"*
 """)
 
 # 系统状态指示器
@@ -360,7 +361,8 @@ def init_predictors():
                 logging.error("RF预测器初始化失败: 模型未加载")
                 del predictors['rf']
             else:
-                st.sidebar.info("✅ RF模型加载成功")
+                # st.sidebar.info("✅ RF模型加载成功")
+                pass
         except Exception as e:
             logging.error(f"RF预测器初始化失败: {e}")
             st.sidebar.error(f"❌ RF预测器初始化失败: {str(e)[:50]}")
@@ -369,7 +371,8 @@ def init_predictors():
     if GNN_PREDICTOR_AVAILABLE:
         try:
             predictors['gnn'] = GCNPredictor(device='cpu')
-            st.sidebar.info("✅ GNN模型加载成功")
+            # st.sidebar.info("✅ GNN模型加载成功")
+            pass
         except Exception as e:
             logging.error(f"GNN预测器初始化失败: {e}")
             st.sidebar.error(f"❌ GNN预测器初始化失败: {str(e)[:50]}")
