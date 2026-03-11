@@ -922,7 +922,7 @@ with tab4:
     st.caption("从活性分子中提取共同药效团特征（氢键供/受体、疏水区等），生成 3D 药效团模型，指导分子优化。")
     st.info(
         "🎓 **教学点**：从多个活性分子中提取共同药效团特征（氢键供/受体、疏水区、芳香环），"
-        "建立3D药效团模型，理解"哪些原子团对活性至关重要"。"
+        "建立3D药效团模型，理解\"哪些原子团对活性至关重要\"。"
     )
     if PHARMACOPHORE_AVAILABLE:
         pharmacophore_streamlit.render_pharmacophore_tab()
