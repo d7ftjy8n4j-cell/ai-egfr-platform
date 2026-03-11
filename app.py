@@ -13,7 +13,7 @@ from datetime import datetime
 # ========== 设置页面（必须在任何Streamlit命令之前） ==========
 import streamlit as st
 st.set_page_config(
-    page_title="EGFR抑制剂智能预测系统 (双引擎)",
+    page_title="药尘光 · EGFR抑制剂智能发现平台",
     page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -577,7 +577,11 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
 with tab1:
     st.header("🧪 分子活性预测")
     st.caption("输入 SMILES，选择预测模式，快速评估分子对 EGFR 的抑制活性。双模型对比可提高结果可靠性。")
-    
+    st.info(
+        "🎓 **教学点**：对比随机森林（基于特征工程）与图神经网络（基于分子图结构）的预测结果，"
+        "理解两种AI范式的差异。当两个模型结论不一致时，思考可能的原因（如分子中的特殊环结构）。"
+    )
+
     # 预测模式选择
     prediction_mode = st.radio(
         "**选择预测模式**",
@@ -725,6 +729,10 @@ with tab1:
 with tab2:
     st.header("🛡️ 药物类属性与安全性筛选")
     st.caption("评估化合物的成药潜力：Lipinski 五规则（ADME）和毒性警报（PAINS/Brenk）。单分子或批量筛选。")
+    st.info(
+        "🎓 **教学点**：理解Lipinski五规则（分子量、LogP、氢键供体/受体）如何评估口服成药性，"
+        "以及PAINS/Brenk子结构警报提示的潜在风险。"
+    )
 
     if not FILTER_AVAILABLE:
         st.error("筛选模块未加载，请检查 chem_filter.py 文件")
@@ -899,6 +907,10 @@ with tab2:
 with tab3:
     st.header("🔍 化学依据分析")
     st.caption("计算分子理化性质（LogP、分子量等）、基于 Morgan 指纹的相似性搜索，以及多种分子表示对比。")
+    st.info(
+        "🎓 **教学点**：学习分子描述符（如LogP、TPSA）和分子指纹（Morgan指纹）如何量化分子特性，"
+        "并通过相似性搜索发现已知活性化合物。"
+    )
     if CHEM_INSIGHT_AVAILABLE:
         render_safe_chem_insight()
     else:
@@ -908,6 +920,10 @@ with tab3:
 with tab4:
     st.header("🎯 药效团设计")
     st.caption("从活性分子中提取共同药效团特征（氢键供/受体、疏水区等），生成 3D 药效团模型，指导分子优化。")
+    st.info(
+        "🎓 **教学点**：从多个活性分子中提取共同药效团特征（氢键供/受体、疏水区、芳香环），"
+        "建立3D药效团模型，理解"哪些原子团对活性至关重要"。"
+    )
     if PHARMACOPHORE_AVAILABLE:
         pharmacophore_streamlit.render_pharmacophore_tab()
     else:
@@ -917,7 +933,11 @@ with tab4:
 with tab5:
     st.header("🔗 蛋白质-配体 3D 结构可视化")
     st.caption("加载蛋白质-配体复合物（PDB ID 或本地文件），交互式查看三维结构及相互作用。")
-    
+    st.info(
+        "🎓 **教学点**：观察蛋白质-配体复合物的三维结构，理解相互作用（氢键、疏水作用）如何影响结合亲和力。"
+        "可加载EGFR相关PDB结构（如3POZ、1M17）。"
+    )
+
     if not VIZ_AVAILABLE:
         st.error("⚠️ 可视化模块加载失败")
         st.code(f"错误详情: {VIZ_ERROR}", language="text")
@@ -1067,6 +1087,10 @@ with tab5:
 with tab6:
     st.header("📊 模型性能分析")
     st.caption("查看双引擎模型的性能指标（AUC、准确率）、特征重要性排序和混淆矩阵。")
+    st.info(
+        "🎓 **教学点**：查看双引擎模型的性能指标（AUC、准确率）和特征重要性，"
+        "理解模型评估方法及可解释性分析的价值。"
+    )
 
     rf_perf = get_model_performance('rf')
     gnn_perf = get_model_performance('gnn')
@@ -1114,6 +1138,9 @@ with tab6:
 with tab7:
     st.header("🔬 技术实现详情")
     st.caption("系统架构、技术栈、特征工程对比及模型性能详细说明。")
+    st.info(
+        "🎓 **教学点**：了解系统架构、技术栈和特征工程对比，深入理解AI药物设计平台的技术实现。"
+    )
 
     st.markdown("""
     ### 🏗️ 系统架构
@@ -1161,6 +1188,9 @@ with tab7:
 with tab8:
     st.header("📚 关于项目")
     st.caption("项目背景、特色、文件清单及致谢。")
+    st.info(
+        "🎓 **教学点**：了解项目背景、特色、数据来源及开源资源，培养科研诚信与可复现意识。"
+    )
 
     st.markdown("""
     ### 🎯 项目简介
@@ -1214,6 +1244,12 @@ with tab8:
 
 # ========== 6. 侧边栏信息 ==========
 with st.sidebar:
+    # 品牌区
+    st.markdown("## **药尘光**")
+    st.caption("*双核驱动，理形相生*")
+    st.divider()
+
+    # 原有的系统配置等代码保持不变...
     st.header("⚙️ 系统配置")
 
     # 模型状态
@@ -1274,6 +1310,22 @@ with st.sidebar:
             else:
                 st.warning("没有可用的模型结果")
 
+    # ----- 新增：教学指南 -----
+    with st.expander("📘 教学指南（新手必读）", expanded=False):
+        st.markdown("""
+        **药尘光 · 学习路径**  
+        1. **🧪 分子预测**：输入SMILES，体验双引擎对比  
+        2. **🛡️ 药物筛选**：评估成药性与毒性风险  
+        3. **🔍 化学依据**：探索分子性质与相似性  
+        4. **🎯 药效团设计**：生成3D药效团模型  
+        5. **🔗 3D结构**：观察蛋白-配体相互作用  
+        6. **📊 模型分析**：理解模型性能与特征  
+        ---
+        *"双核驱动，理形相生"*  
+        随机森林（理）与图神经网络（形）相互验证，让AI决策透明可解释。
+        """)
+    # ---------------------------
+
     # ----- 新增：功能导航指南 -----
     with st.expander("📖 功能导航指南", expanded=False):
         st.markdown("""
@@ -1299,9 +1351,9 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-    🧬 EGFR抑制剂双引擎智能预测系统 | RF + 深度学习集成 | © 2026
+    🧬 药尘光 · EGFR抑制剂智能发现平台 | 双核驱动，理形相生 | © 2026
     <br>
-    <small>基于TeachOpenCADD教程构建 | 仅供学术研究使用</small>
+    <small>面向本科生的AIDD教学平台 · 打开浏览器即学即用</small>
     </div>
     """,
     unsafe_allow_html=True
