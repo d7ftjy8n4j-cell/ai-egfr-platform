@@ -409,7 +409,7 @@ def page_molecular_prediction():
     st.header("🧪 分子活性预测")
     st.caption("输入 SMILES，选择预测模式，快速评估分子对 EGFR 的抑制活性。双模型对比可提高结果可靠性。")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("对比随机森林（基于特征工程）与图神经网络（基于分子图结构）的预测结果，"
                     "理解两种AI范式的差异。当两个模型结论不一致时，思考可能的原因（如分子中的特殊环结构）。")
 
@@ -534,7 +534,7 @@ def page_drug_screening():
     st.header("🛡️ 药物类属性与安全性筛选")
     st.caption("评估化合物的成药潜力：Lipinski 五规则（ADME）和毒性警报（PAINS/Brenk）。单分子或批量筛选。")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("理解Lipinski五规则（分子量、LogP、氢键供体/受体）如何评估口服成药性，"
                     "以及PAINS/Brenk子结构警报提示的潜在风险。")
 
@@ -660,7 +660,7 @@ def page_chem_insight():
     st.header("🔍 化学依据分析")
     st.caption("计算分子理化性质（LogP、分子量等）、基于 Morgan 指纹的相似性搜索，以及多种分子表示对比。")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("学习分子描述符（如LogP、TPSA）和分子指纹（Morgan指纹）如何量化分子特性，"
                     "并通过相似性搜索发现已知活性化合物。")
 
@@ -676,7 +676,7 @@ def page_pharmacophore():
     st.header("🎯 药效团设计")
     st.caption("从活性分子中提取共同药效团特征（氢键供/受体、疏水区等），生成 3D 药效团模型，指导分子优化。")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("从多个活性分子中提取共同药效团特征（氢键供/受体、疏水区、芳香环），"
                     "建立3D药效团模型，理解「哪些原子团对活性至关重要」。")
 
@@ -692,7 +692,7 @@ def page_3d_structure():
     st.header("🔗 蛋白质-配体 3D 结构可视化")
     st.caption("加载蛋白质-配体复合物（PDB ID 或本地文件），交互式查看三维结构及相互作用。")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("观察蛋白质-配体复合物的三维结构，理解相互作用（氢键、疏水作用）如何影响结合亲和力。"
                     "可加载EGFR相关PDB结构（如3POZ、1M17）。")
 
@@ -813,7 +813,7 @@ def page_model_analysis():
     st.header("📊 模型性能分析")
     st.caption("查看双引擎模型的性能指标（AUC、准确率）、特征重要性排序和混淆矩阵。")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("查看双引擎模型的性能指标（AUC、准确率）和特征重要性，"
                     "理解模型评估方法及可解释性分析的价值。")
 
@@ -859,7 +859,7 @@ def page_tech_details():
     st.header("🔬 技术实现详情")
     st.caption("双引擎架构、技术栈与模型性能一览")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("了解系统架构、技术栈和特征工程对比，深入理解AI药物设计平台的技术实现。")
 
     st.markdown("""
@@ -905,7 +905,7 @@ def page_about():
     st.header("📚 关于药尘光")
     st.caption("项目背景、核心理念、特色与致谢")
 
-    with st.popover("🎓 教学点", icon="📘"):
+    with st.popover("🎓 教学点"):
         st.markdown("了解项目背景、特色、数据来源及开源资源，培养科研诚信与可复现意识。")
 
     st.markdown("""

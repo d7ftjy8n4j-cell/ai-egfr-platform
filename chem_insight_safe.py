@@ -379,33 +379,19 @@ def render_safe_chem_insight():
                             smiles_short = mol_info['smiles'][:30] + ("..." if len(mol_info['smiles']) > 30 else "")
                             col.caption(f"`{smiles_short}`")
 
-                    # ----- 新增：相似性表格点击联动 -----
-                    st.subheader("🔍 相似性结果表格（点击选择）")
+                    # ----- 相似性结果表格（改用 selectbox 方式，兼容所有版本） -----
+                    st.subheader("🔍 相似性结果（点击选择分子）")
 
-                    # 构建可点击的 DataFrame
-                    similar_df = pd.DataFrame([{
-                        '编号': idx + 1,
-                        '名称': m.get('name', '未知'),
-                        'SMILES': m['smiles'][:50] + ('...' if len(m['smiles']) > 50 else ''),
-                        '相似度': m['similarity'],
-                        '活性': '✅ 活性' if m.get('is_active', False) else ('❌ 非活性' if m.get('activity') else 'N/A'),
-                        'pIC50': m.get('activity', 'N/A')
-                    } for idx, m in enumerate(similar_mols)])
+                    # 构建用于选择的选项列表
+                    options = [f"{idx+1}. {m.get('name', '未知')} (相似度: {m['similarity']:.3f})"
+                               for idx, m in enumerate(similar_mols)]
+                    selected_option = st.selectbox("选择要操作的分子", options, key="sim_select")
 
-                    # 使用 selection 参数
-                    selected_rows = st.dataframe(
-                        similar_df,
-                        selection_mode="single-row",
-                        use_container_width=True,
-                        column_config={
-                            "相似度": st.column_config.NumberColumn(format="%.3f")
-                        }
-                    )
-
-                    if selected_rows and selected_rows.get('rows'):
-                        idx = selected_rows['rows'][0]
+                    if selected_option:
+                        # 提取索引
+                        idx = int(selected_option.split('.')[0]) - 1
                         selected_smiles = similar_mols[idx]['smiles']
-                        st.info(f"你点击了分子：`{selected_smiles[:50]}{'...' if len(selected_smiles) > 50 else ''}`")
+                        st.info(f"你选择了：`{selected_smiles[:50]}{'...' if len(selected_smiles) > 50 else ''}`")
 
                         if st.button("🚀 复制 SMILES 到预测页面"):
                             st.session_state['smiles_input'] = selected_smiles
