@@ -374,7 +374,7 @@ def compare_results(rf_result, gnn_result):
     if comparison_data:
         df_compare = pd.DataFrame(comparison_data)
         column_config = {
-            "模型": st.column_config.TextColumn(frozen=True, alignment="left"),
+            "模型": st.column_config.TextColumn(alignment="left"),
             "预测": st.column_config.TextColumn(alignment="center"),
             "活性概率": st.column_config.NumberColumn(alignment="right", format="%.4f"),
             "置信度": st.column_config.TextColumn(alignment="center"),
