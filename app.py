@@ -13,7 +13,7 @@ from datetime import datetime
 # ========== 设置页面（必须在任何Streamlit命令之前） ==========
 import streamlit as st
 st.set_page_config(
-    page_title="药尘光 · EGFR抑制剂智能发现平台",
+    page_title="药尘光 · EGFR抑制剂智能发现与设计平台",
     page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -944,7 +944,7 @@ def render_sidebar():
     with st.sidebar:
         # 添加 Logo（Streamlit 1.54+）
         try:
-            st.logo("🧬 药尘光 · EGFR智能发现平台", icon="🧬")
+            st.logo("🧬 药尘光 · EGFR智能发现与设计平台", icon="🧬")
         except Exception:
             pass  # 旧版本不支持，优雅降级
 
@@ -1122,7 +1122,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center; color: gray;'>
-        🧬 药尘光 · EGFR抑制剂智能发现平台 | 双核驱动，理形相生 | © 2026
+        🧬 药尘光 · EGFR抑制剂智能发现与设计平台 | 双核驱动，理形相生 | © 2026
         <br>
         <small>面向本科生的AIDD教学平台 · 打开浏览器即学即用</small>
         </div>
