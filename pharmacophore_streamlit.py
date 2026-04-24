@@ -192,48 +192,45 @@ class StreamlitPharmacophore:
                 
         return ensemble_features
     
-    def visualize_ensemble_pharmacophore_3d(self, ensemble_features, width=800, height=600):
-        """3D可视化集成药效团"""
+    def visualize_ensemble_pharmacophore_3d(self, ensemble_features, width=900, height=700):
+        """
+        3D可视化集成药效团，并自动调整缩放至合适大小
+        """
         viewer = py3Dmol.view(width=width, height=height)
-        
-        # 添加分子
+
+        # 添加所有分子（沿用之前的样式）
         for i, mol in enumerate(self.molecules):
-            # 将分子转换为PDB字符串
             pdb_block = Chem.MolToPDBBlock(mol)
             viewer.addModel(pdb_block, 'pdb')
-            
-            # 设置分子样式
-            viewer.setStyle({'model': i}, 
-                          {'stick': {'colorscheme': 'grayCarbon', 'radius': 0.2}})
-        
+            viewer.setStyle({'model': i}, {'stick': {'colorscheme': 'grayCarbon', 'radius': 0.2}})
+
         # 添加药效团特征
         for ftype, feature in ensemble_features.items():
             pos = feature["position"]
             color = self.feature_colors.get(ftype, (1, 1, 1))
             radius = feature.get("radius", 1.5)
             importance = feature.get("importance", 1.0)
-            
-            # 设置透明度基于重要性
             opacity = 0.3 + 0.7 * importance
-            
-            # 添加球体
             viewer.addSphere({
                 'center': {'x': pos[0], 'y': pos[1], 'z': pos[2]},
                 'radius': radius,
                 'color': f'rgb({int(color[0]*255)},{int(color[1]*255)},{int(color[2]*255)})',
                 'opacity': opacity
             })
-            
-            # 添加标签
             viewer.addLabel(
-                f"{ftype}\n{importance:.1%}",
-                {'position': {'x': pos[0], 'y': pos[1]+radius, 'z': pos[2]},
-                 'backgroundColor': f'rgba({int(color[0]*255)},{int(color[1]*255)},{int(color[2]*255)},0.7)',
-                 'fontColor': 'black',
-                 'fontSize': 12}
+                f"{ftype}\n{importance:.0%}",
+                {
+                    'position': {'x': pos[0], 'y': pos[1] + radius, 'z': pos[2]},
+                    'backgroundColor': f'rgba({int(color[0]*255)},{int(color[1]*255)},{int(color[2]*255)},0.7)',
+                    'fontColor': 'black',
+                    'fontSize': 12
+                }
             )
-        
-        viewer.zoomTo()
+
+        # 关键：自动计算合适的缩放并拉近视角
+        viewer.zoomTo()           # 让相机对准所有对象
+        viewer.zoom(1.6)          # 额外放大60%
+
         return viewer
     
     def visualize_2d_pharmacophore(self, ensemble_features, width=600, height=400):
@@ -535,16 +532,12 @@ CC(=O)OC1=CC=CC=C1C(=O)O"""
                         st.subheader("3D药效团模型")
                         viewer = generator.visualize_ensemble_pharmacophore_3d(
                             ensemble_features,
-                            width=800,
-                            height=600
+                            width=1000,
+                            height=800
                         )
 
-                        # 在Streamlit中显示
-                        if STMOL_AVAILABLE and showmol:
-                            showmol(viewer, height=600)
-                        else:
-                            st.warning("⚠️ stmol 不可用，使用基础HTML渲染")
-                            st.components.v1.html(viewer._make_html(), height=600, scrolling=True)
+                        # 使用原生HTML嵌入（全宽显示）
+                        st.components.v1.html(viewer._make_html(), height=800, width=1000, scrolling=False)
                         
                         # 2D统计图
                         st.subheader("特征统计")
