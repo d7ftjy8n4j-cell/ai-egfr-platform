@@ -968,38 +968,37 @@ def render_sidebar():
 
         # 快速操作
         st.subheader("🔗 快速操作")
-        with st.menu_button("🔧 执行操作", icon="⚙️"):
-            if st.button("🔄 重置所有预测", use_container_width=True):
-                st.session_state.prediction_count = 0
-                st.rerun()
-
-            if st.button("📥 导出当前结果", use_container_width=True, key="export_btn"):
-                if not st.session_state.get('last_smiles'):
-                    st.warning("暂无预测结果可导出")
-                else:
-                    # 使用 st.dialog 弹窗导出
-                    @st.dialog("📥 导出预测结果", icon="📊")
-                    def export_dialog():
-                        export_data = {}
-                        if st.session_state.get('last_rf_result'):
-                            rf_result = st.session_state.last_rf_result
-                            if isinstance(rf_result, dict) and 'error' not in rf_result:
-                                export_data['rf'] = rf_result
-                        if st.session_state.get('last_gnn_result'):
-                            gnn_result = st.session_state.last_gnn_result
-                            if isinstance(gnn_result, dict) and gnn_result.get('success', True):
-                                export_data['gnn'] = gnn_result
-                        if export_data:
-                            df = export_results_to_dataframe(export_data)
-                            st.dataframe(df, use_container_width=True, hide_index=True)
-                            csv = df.to_csv(index=False, encoding='utf-8-sig')
-                            filename = f"egfr_prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-                            st.download_button(label="📥 下载CSV文件", data=csv, file_name=filename, mime="text/csv")
-                        else:
-                            st.warning("没有可用的模型结果")
-                        if st.button("关闭", type="secondary"):
-                            st.rerun()
-                    export_dialog()
+        if st.button("🔄 重置所有预测", use_container_width=True):
+            st.session_state.prediction_count = 0
+            st.rerun()
+        
+        if st.button("📥 导出当前结果", use_container_width=True):
+            if not st.session_state.get('last_smiles'):
+                st.warning("暂无预测结果可导出")
+            else:
+                # 使用 st.dialog 弹窗导出
+                @st.dialog("📥 导出预测结果", icon="📊")
+                def export_dialog():
+                    export_data = {}
+                    if st.session_state.get('last_rf_result'):
+                        rf_result = st.session_state.last_rf_result
+                        if isinstance(rf_result, dict) and 'error' not in rf_result:
+                            export_data['rf'] = rf_result
+                    if st.session_state.get('last_gnn_result'):
+                        gnn_result = st.session_state.last_gnn_result
+                        if isinstance(gnn_result, dict) and gnn_result.get('success', True):
+                            export_data['gnn'] = gnn_result
+                    if export_data:
+                        df = export_results_to_dataframe(export_data)
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+                        csv = df.to_csv(index=False, encoding='utf-8-sig')
+                        filename = f"egfr_prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                        st.download_button(label="📥 下载CSV文件", data=csv, file_name=filename, mime="text/csv")
+                    else:
+                        st.warning("没有可用的模型结果")
+                    if st.button("关闭", type="secondary"):
+                        st.rerun()
+                export_dialog()
 
         # 教学指南
         with st.expander("📘 教学指南（新手必读）", expanded=False):
@@ -1047,30 +1046,24 @@ def render_sidebar():
 # ============================================================
 def render_header_banner():
     """渲染顶部Banner和动画"""
-    # 动画Banner
-    st.html("""
-    <div style="background: linear-gradient(135deg, #0a0a2a, #1a1a3a); padding: 0.5rem; border-radius: 1rem; text-align: center; margin-bottom: 1rem;">
-        <span style="color: cyan;">⚡ 双核驱动 · 理形相生</span> 🧬 <span style="color: gold;">AI · 创新 · 共享</span>
-    </div>
-    """)
-
-    # 标题 + 光效动画
-    st.html("""
-    <div style="text-align: center; margin-bottom: 0rem;">
-        <span id="glow-text" style="font-size: 2.5rem; font-weight: bold; background: linear-gradient(135deg, cyan, gold); -webkit-background-clip: text; background-clip: text; color: transparent; transition: text-shadow 0.3s;">药尘光</span>
+    # 优雅的呼吸动画 + 标语
+    st.markdown("""
+    <div style="text-align: center; margin: 0rem 0 1rem 0;">
+        <div style="font-size: 2.2rem; font-weight: 600; background: linear-gradient(135deg, #00c6ff, #0072ff); -webkit-background-clip: text; background-clip: text; color: transparent; animation: gentleGlow 3s ease-in-out infinite;">
+            药尘光
+        </div>
+        <div style="font-size: 0.9rem; color: #888; letter-spacing: 1px; margin-top: 0.2rem;">
+            ⚡ 双核驱动 · 理形相生 🧬 AI · 创新 · 共享
+        </div>
     </div>
     <style>
-        @keyframes glow {
-            0% { text-shadow: 0 0 0px cyan, 0 0 0px gold; }
-            50% { text-shadow: 0 0 10px cyan, 0 0 20px gold; }
-            100% { text-shadow: 0 0 0px cyan, 0 0 0px gold; }
-        }
-        #glow-text {
-            animation: glow 2s infinite;
-            display: inline-block;
+        @keyframes gentleGlow {
+            0% { text-shadow: 0 0 2px rgba(0,198,255,0.2), 0 0 2px rgba(0,114,255,0.2); opacity: 0.9; }
+            50% { text-shadow: 0 0 8px rgba(0,198,255,0.5), 0 0 12px rgba(0,114,255,0.4); opacity: 1; }
+            100% { text-shadow: 0 0 2px rgba(0,198,255,0.2), 0 0 2px rgba(0,114,255,0.2); opacity: 0.9; }
         }
     </style>
-    """, unsafe_allow_javascript=True)
+    """, unsafe_allow_html=True)
 
     st.title("🧬 EGFR抑制剂智能发现平台")
 
