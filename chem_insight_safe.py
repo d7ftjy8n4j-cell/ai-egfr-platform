@@ -341,29 +341,29 @@ def render_safe_chem_insight():
                 
                 if similar_mols:
                     st.success(f"✅ 找到 {len(similar_mols)} 个相似化合物")
-                    
+
                     # 显示统计信息
                     avg_sim = np.mean([m['similarity'] for m in similar_mols])
                     active_count = sum([1 for m in similar_mols if m.get('is_active', False)])
-                    
+
                     col_stat1, col_stat2, col_stat3 = st.columns(3)
                     col_stat1.metric("平均相似度", f"{avg_sim:.3f}")
                     col_stat2.metric("活性化合物", active_count)
-                    col_stat3.metric("最高相似度", 
+                    col_stat3.metric("最高相似度",
                                    f"{max([m['similarity'] for m in similar_mols]):.3f}")
-                    
+
                     # 显示相似分子
                     st.subheader("相似化合物详情")
-                    
+
                     # 使用列显示
                     cols = st.columns(min(5, len(similar_mols)))
                     for idx, (col, mol_info) in enumerate(zip(cols, similar_mols)):
                         with col:
                             if mol_info['mol_obj']:
                                 img = Draw.MolToImage(mol_info['mol_obj'], size=(150, 100))
-                                col.image(img, 
+                                col.image(img,
                                          caption=f"#{idx+1}: {mol_info['similarity']:.3f}")
-                            
+
                             # 活性状态
                             activity = mol_info.get('activity')
                             if activity is not None:
@@ -374,10 +374,43 @@ def render_safe_chem_insight():
                                     col.error(f"❌ {activity_text}")
                             else:
                                 col.info("活性: N/A")
-                            
+
                             # SMILES片段
                             smiles_short = mol_info['smiles'][:30] + ("..." if len(mol_info['smiles']) > 30 else "")
                             col.caption(f"`{smiles_short}`")
+
+                    # ----- 新增：相似性表格点击联动 -----
+                    st.subheader("🔍 相似性结果表格（点击选择）")
+
+                    # 构建可点击的 DataFrame
+                    similar_df = pd.DataFrame([{
+                        '编号': idx + 1,
+                        '名称': m.get('name', '未知'),
+                        'SMILES': m['smiles'][:50] + ('...' if len(m['smiles']) > 50 else ''),
+                        '相似度': m['similarity'],
+                        '活性': '✅ 活性' if m.get('is_active', False) else ('❌ 非活性' if m.get('activity') else 'N/A'),
+                        'pIC50': m.get('activity', 'N/A')
+                    } for idx, m in enumerate(similar_mols)])
+
+                    # 使用 selection 参数
+                    selected_rows = st.dataframe(
+                        similar_df,
+                        selection_mode="single-row",
+                        use_container_width=True,
+                        column_config={
+                            "相似度": st.column_config.NumberColumn(format="%.3f")
+                        }
+                    )
+
+                    if selected_rows and selected_rows.get('rows'):
+                        idx = selected_rows['rows'][0]
+                        selected_smiles = similar_mols[idx]['smiles']
+                        st.info(f"你点击了分子：`{selected_smiles[:50]}{'...' if len(selected_smiles) > 50 else ''}`")
+
+                        if st.button("🚀 复制 SMILES 到预测页面"):
+                            st.session_state['smiles_input'] = selected_smiles
+                            st.success("✅ SMILES 已复制，请手动点击「🧪 分子预测」标签页进行预测。")
+                    # -----------------------------------------
                     
                     # 化学意义解读
                     st.subheader("🧪 化学意义解读")
