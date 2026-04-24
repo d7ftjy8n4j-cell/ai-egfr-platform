@@ -1042,10 +1042,10 @@ def render_sidebar():
 
 
 # ============================================================
-# 顶部Banner（动画效果）
+# 首页函数
 # ============================================================
-def render_header_banner():
-    """渲染顶部Banner和动画"""
+def page_home():
+    """首页 - 展示系统概览和模型状态"""
     # 优雅的呼吸动画 + 标语
     st.markdown("""
     <div style="text-align: center; margin: 0rem 0 1rem 0;">
@@ -1096,27 +1096,25 @@ def render_header_banner():
 # ============================================================
 def main():
     """主程序入口"""
-    # 渲染顶部Banner
-    render_header_banner()
-
-    # 构建页面字典
-    pages = {
-        "🧪 分子预测": st.Page(page_molecular_prediction, title="分子预测", icon="🧪"),
-        "🛡️ 药物筛选": st.Page(page_drug_screening, title="药物筛选", icon="🛡️"),
-        "🔍 化学依据": st.Page(page_chem_insight, title="化学依据", icon="🔍"),
-        "🎯 药效团设计": st.Page(page_pharmacophore, title="药效团设计", icon="🎯"),
-        "🔗 3D结构": st.Page(page_3d_structure, title="3D结构", icon="🔗"),
-        "📊 模型分析": st.Page(page_model_analysis, title="模型分析", icon="📊"),
-        "🔬 技术详情": st.Page(page_tech_details, title="技术详情", icon="🔬"),
-        "📚 关于项目": st.Page(page_about, title="关于项目", icon="📚"),
-    }
+    # 构建页面列表（包含首页）
+    pages = [
+        st.Page(page_home, title="🏠 首页", icon="🏠"),
+        st.Page(page_molecular_prediction, title="🧪 分子预测", icon="🧪"),
+        st.Page(page_drug_screening, title="🛡️ 药物筛选", icon="🛡️"),
+        st.Page(page_chem_insight, title="🔍 化学依据", icon="🔍"),
+        st.Page(page_pharmacophore, title="🎯 药效团设计", icon="🎯"),
+        st.Page(page_3d_structure, title="🔗 3D结构", icon="🔗"),
+        st.Page(page_model_analysis, title="📊 模型分析", icon="📊"),
+        st.Page(page_tech_details, title="🔬 技术详情", icon="🔬"),
+        st.Page(page_about, title="📚 关于项目", icon="📚"),
+    ]
 
     # 创建顶部导航
-    pg = st.navigation(list(pages.values()), position="top")
-    
+    pg = st.navigation(pages, position="top")
+
     # 渲染侧边栏
     render_sidebar()
-    
+
     # 运行当前页面
     pg.run()
 
