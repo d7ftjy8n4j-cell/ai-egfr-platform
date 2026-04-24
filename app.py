@@ -1098,15 +1098,15 @@ def main():
     """主程序入口"""
     # 构建页面列表（包含首页）
     pages = [
-        st.Page(page_home, title="🏠 首页", icon="🏠"),
-        st.Page(page_molecular_prediction, title="🧪 分子预测", icon="🧪"),
-        st.Page(page_drug_screening, title="🛡️ 药物筛选", icon="🛡️"),
-        st.Page(page_chem_insight, title="🔍 化学依据", icon="🔍"),
-        st.Page(page_pharmacophore, title="🎯 药效团设计", icon="🎯"),
-        st.Page(page_3d_structure, title="🔗 3D结构", icon="🔗"),
-        st.Page(page_model_analysis, title="📊 模型分析", icon="📊"),
-        st.Page(page_tech_details, title="🔬 技术详情", icon="🔬"),
-        st.Page(page_about, title="📚 关于项目", icon="📚"),
+        st.Page(page_home, title="🏠 首页"),
+        st.Page(page_molecular_prediction, title="🧪 分子预测"),
+        st.Page(page_drug_screening, title="🛡️ 药物筛选"),
+        st.Page(page_chem_insight, title="🔍 化学依据"),
+        st.Page(page_pharmacophore, title="🎯 药效团设计"),
+        st.Page(page_3d_structure, title="🔗 3D结构"),
+        st.Page(page_model_analysis, title="📊 模型分析"),
+        st.Page(page_tech_details, title="🔬 技术详情"),
+        st.Page(page_about, title="📚 关于项目"),
     ]
 
     # 创建顶部导航
