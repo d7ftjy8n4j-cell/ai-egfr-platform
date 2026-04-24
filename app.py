@@ -1065,7 +1065,7 @@ def page_home():
     </style>
     """, unsafe_allow_html=True)
 
-    st.title("🧬 EGFR抑制剂智能发现平台")
+    st.title("🧬 EGFR抑制剂智能发现与设计平台")
 
     st.markdown("""
     **双引擎预测系统** —— 集成传统机器学习与深度学习技术
