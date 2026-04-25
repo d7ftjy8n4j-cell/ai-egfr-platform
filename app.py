@@ -77,8 +77,8 @@ class Config:
     MAX_SMILES_LENGTH = 1000
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     LOG_FILE = os.path.join(BASE_DIR, "app.log")
-    RF_DEFAULT_PERF = {'auc': 0.855, 'accuracy': 0.830, 'feature_count': '200+'}
-    GNN_DEFAULT_PERF = {'auc': 0.808, 'accuracy': 0.765, 'node_features': '12维'}
+    RF_DEFAULT_PERF = {'auc': 0.8695, 'accuracy': 0.7856, 'feature_count': '200+'}
+    GNN_DEFAULT_PERF = {'auc': 0.8628, 'accuracy': 0.7842, 'node_features': '12维'}
     SMILES_PATTERN = r'^[A-Za-z0-9@+\-\[\]\(\)\\\/%=#$]+$'
     LOG_LEVEL = logging.INFO
 
