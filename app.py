@@ -926,7 +926,7 @@ def page_about():
 
     ### 📦 资源与致谢
 
-    - **数据来源**：ChEMBL 数据库（5,568 个 EGFR 化合物）
+    - **数据来源**：ChEMBL 数据库（13,286 个 EGFR 化合物，经 IC50 筛选去重后）
     - **技术框架**：Streamlit、RDKit、PyTorch Geometric、scikit-learn
     - **开源协议**：仅供学术研究使用，详情见 GitHub 仓库
 
@@ -1087,7 +1087,7 @@ def page_home():
                  f"AUC: {gnn_perf.get('auc', 'N/A')}" if GNN_PREDICTOR_AVAILABLE else "N/A",
                  border=True)
     with col3:
-        st.metric("数据集", "5,568化合物", "58.5%活性", border=True)
+        st.metric("数据集", "13,286化合物", "50.8%活性", border=True)
 
 
 # ============================================================
